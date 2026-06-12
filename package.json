@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "description": "AI news aggregation backend: collects AI news, synthesizes them with Claude into site posts and LinkedIn-ready posts.",
+  "license": "MIT",
+  "author": "Ivan Baev <ivanbbaev@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LeassTaTT/kiko.git"
+  },
   "type": "module",
   "engines": {
     "node": ">=20.12"
