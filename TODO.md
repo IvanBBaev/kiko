@@ -14,7 +14,6 @@
 - [ ] `docker build` smoke — Docker daemon-ът не вървеше на машината; стартирай
       Docker Desktop и: `docker compose up --build`
 - [ ] External uptime monitoring на `/health` (UptimeRobot/healthchecks.io) — нужен акаунт
-- [ ] GitHub remote + push (repo-то е локално; CI/Dependabot чакат remote)
 
 ### Следващи (от "Дълбок анализ за 11/10")
 
@@ -39,6 +38,13 @@
 ---
 
 ## DONE
+
+### 2026-06-12 — GitHub: remote, gmail identity, push
+- [x] origin → https://github.com/LeassTaTT/kiko (HTTPS, osxkeychain)
+- [x] Комитите пренаписани с `ivanbbaev@gmail.com` (локален git config; глобалният
+      остава работният за core-apps)
+- [x] main пушнат с gmail историята (force-with-lease — замени първоначалния push
+      с нуволските комити); CI/Dependabot активни
 
 ### 2026-06-12 — Качествени гейтове + OpenAPI (продължение на TODO файла)
 
