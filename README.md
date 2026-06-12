@@ -68,20 +68,26 @@ call, no tokens.
 
 ## API
 
-| Method | Path                      | Description                                  |
-|--------|---------------------------|----------------------------------------------|
-| GET    | `/health`                 | Liveness + DB check                          |
-| GET    | `/api/posts`              | List posts (`?kind=site\|linkedin&status=draft\|published&limit&offset`) |
-| GET    | `/api/posts/:id`          | Single post                                  |
-| POST   | `/api/posts/:id/publish`  | Mark a post as published 🔒                  |
-| POST   | `/api/posts/:id/unpublish`| Back to draft 🔒                             |
-| GET    | `/api/news`               | Raw news items (`?status=new\|digested`)     |
-| POST   | `/api/pipeline/run`       | Trigger a pipeline run (202, background) 🔒  |
-| GET    | `/api/runs`               | Last 20 pipeline runs                        |
-| GET    | `/api/usage`              | Aggregate token spend across all posts       |
+| Method | Path                        | Description                                  |
+|--------|-----------------------------|----------------------------------------------|
+| GET    | `/health`                   | Liveness + DB check + last run / next cron fire |
+| GET    | `/api/posts`                | List posts (`?kind&status&limit&offset`), pagination metadata |
+| GET    | `/api/posts/search`         | FTS5 full-text search (`?q=&limit=`)         |
+| GET    | `/api/posts/:id`            | Single post (sources resolve `[n]` citations to URLs) |
+| POST   | `/api/posts/:id/publish`    | Mark a post as published 🔒 (fires `post.published` webhook) |
+| POST   | `/api/posts/:id/unpublish`  | Back to draft 🔒                             |
+| POST   | `/api/posts/:id/regenerate` | New channel post from an existing digest (`?kind=linkedin`) 🔒 |
+| GET    | `/feed.xml`                 | RSS feed of published site posts             |
+| GET    | `/api/news`                 | Raw news items (`?status=new\|digested`)     |
+| POST   | `/api/pipeline/run`         | Trigger a pipeline run (202, background) 🔒  |
+| GET    | `/api/runs`                 | Last 20 pipeline runs (incl. token spend per run) |
+| GET    | `/api/usage`                | Aggregate token spend across all posts       |
 
 🔒 — when `API_TOKEN` is set, these require `Authorization: Bearer <token>`.
 Posts are created as `draft`; the site should query `?status=published`.
+Errors are uniformly `{ "error": string, "statusCode": number }`.
+When `WEBHOOK_URL` is set, `run.error` / `run.partial` / `post.published`
+events are POSTed there as JSON.
 
 ## Running
 
