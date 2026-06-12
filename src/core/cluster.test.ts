@@ -51,7 +51,10 @@ describe('clusterItems', () => {
       item('EU passes new AI regulation framework', 'MIT TR'),
     ];
     const ids = clusterItemIds(clusterItems(items));
-    assert.deepEqual([...ids].sort((a, b) => a - b), items.map((i) => i.id).sort((a, b) => a - b));
+    assert.deepEqual(
+      [...ids].sort((a, b) => a - b),
+      items.map((i) => i.id).sort((a, b) => a - b),
+    );
   });
 
   it('handles empty input', () => {

@@ -52,7 +52,9 @@ export const posts = sqliteTable(
   (t) => [
     index('idx_posts_kind').on(t.kind),
     index('idx_posts_status').on(t.status),
-    uniqueIndex('idx_posts_slug_unique').on(t.slug).where(sql`slug IS NOT NULL`),
+    uniqueIndex('idx_posts_slug_unique')
+      .on(t.slug)
+      .where(sql`slug IS NOT NULL`),
   ],
 );
 

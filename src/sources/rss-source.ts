@@ -27,11 +27,12 @@ const parser = new Parser();
 /** Default conditional-GET state: process-lived in-memory map. */
 class InMemoryValidatorStore implements FeedValidatorStore {
   private readonly map = new Map<string, FeedValidators>();
-  async get(feedUrl: string): Promise<FeedValidators | null> {
-    return this.map.get(feedUrl) ?? null;
+  get(feedUrl: string): Promise<FeedValidators | null> {
+    return Promise.resolve(this.map.get(feedUrl) ?? null);
   }
-  async set(feedUrl: string, validators: FeedValidators): Promise<void> {
+  set(feedUrl: string, validators: FeedValidators): Promise<void> {
     this.map.set(feedUrl, validators);
+    return Promise.resolve();
   }
 }
 

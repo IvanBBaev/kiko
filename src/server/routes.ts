@@ -129,7 +129,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
 
       const [rows, [counted]] = await Promise.all([
         db.select().from(posts).where(where).orderBy(desc(posts.createdAt)).limit(limit).offset(offset),
-        db.select({ total: sql<number>`count(*)` }).from(posts).where(where),
+        db
+          .select({ total: sql<number>`count(*)` })
+          .from(posts)
+          .where(where),
       ]);
 
       // Posts change twice a day — let the site and CDNs cache reads briefly.
@@ -163,16 +166,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.get<{ Params: { id: number } }>(
-    '/api/posts/:id',
-    { schema: { params: idParamsSchema } },
-    async (req, reply) => {
-      const [row] = await db.select().from(posts).where(eq(posts.id, req.params.id));
-      if (!row) return reply.code(404).send({ error: 'post not found' });
-      void reply.header('Cache-Control', 'public, max-age=300');
-      return serializePost(row);
-    },
-  );
+  app.get<{ Params: { id: number } }>('/api/posts/:id', { schema: { params: idParamsSchema } }, async (req, reply) => {
+    const [row] = await db.select().from(posts).where(eq(posts.id, req.params.id));
+    if (!row) return reply.code(404).send({ error: 'post not found' });
+    void reply.header('Cache-Control', 'public, max-age=300');
+    return serializePost(row);
+  });
 
   app.post<{ Params: { id: number } }>(
     '/api/posts/:id/publish',
