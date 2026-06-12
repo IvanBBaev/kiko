@@ -1,0 +1,39 @@
+{
+  "name": "kiko",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI news aggregation backend: collects AI news, synthesizes them with Claude into site posts and LinkedIn-ready posts.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "pipeline": "tsx src/cli/run-pipeline.ts",
+    "ingest": "tsx src/cli/ingest.ts",
+    "db:backup": "tsx src/cli/backup.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
+    "@fastify/cors": "^11.2.0",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/rate-limit": "^11.0.0",
+    "better-sqlite3": "^12.10.0",
+    "croner": "^10.0.1",
+    "drizzle-orm": "^0.45.2",
+    "fastify": "^5.8.5",
+    "pino": "^10.3.1",
+    "rss-parser": "^3.13.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.9.3",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}

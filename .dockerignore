@@ -1,0 +1,11 @@
+node_modules
+dist
+data
+.env
+*.log
+.DS_Store
+WORKLOG.md
+TODO.md
+docs
+README.md
+.claude
