@@ -40,6 +40,7 @@
 ## DONE
 
 ### 2026-06-12 — GitHub: remote, gmail identity, push
+
 - [x] origin → https://github.com/LeassTaTT/kiko (HTTPS, osxkeychain)
 - [x] Комитите пренаписани с `ivanbbaev@gmail.com` (локален git config; глобалният
       остава работният за core-apps)

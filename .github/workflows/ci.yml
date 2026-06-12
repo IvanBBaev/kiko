@@ -5,8 +5,11 @@ on:
   pull_request:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -14,9 +17,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm test
-      - run: npm run build
-      - run: npm audit --omit=dev --audit-level=high
+      - name: Check (build, typecheck, lint, format, tests, coverage ≥85% lines / ≥80% branches / ≥88% functions)
+        run: npm run check
+      - name: Audit production dependencies (high+)
+        run: npm audit --omit=dev --audit-level=high
