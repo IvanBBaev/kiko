@@ -7,99 +7,28 @@
 
 ## TODO
 
-### Към "110% работещ и използваем"
+### Блокирани от външни фактори
 - [ ] Първи реален pipeline run срещу Anthropic API (изисква `ANTHROPIC_API_KEY` в `.env`) —
       не-LLM половината е верифицирана на живо; остава само LLM частта
+- [ ] `docker build` smoke — Docker daemon-ът не вървеше на машината; стартирай
+      Docker Desktop и: `docker compose up --build`
+- [ ] External uptime monitoring на `/health` (UptimeRobot/healthchecks.io) — нужен акаунт
+- [ ] GitHub remote + push (repo-то е локално; CI/Dependabot чакат remote)
 
-### Троен анализ на липсите (2026-06-12)
-
-**Анализ 1 — функционални липси:**
-- [ ] `POST /api/posts/:id/regenerate` — прегенериране на LinkedIn пост от съществуващ
-      digest (евтин call, без нов synthesis); полезно при незадоволителен резултат
-- [ ] Известяване при `error`/`partial` run (Telegram/email/webhook) — сега грешката
-      се вижда само ако някой погледне `/api/runs`
-- [ ] Персистентни feed validators (ETag/Last-Modified в БД) — сега са in-memory
-      и се губят при рестарт (малка загуба, но е една колона)
-
-**Анализ 2 — операционни липси:**
-- [ ] `git init` + CI (GitHub Actions: typecheck + test при всеки push) — проектът
-      все още не е git repo!
-- [ ] Backup стратегия: Litestream (continuous replication) или cron копие на `data/`
-- [ ] External uptime monitoring на `/health` (UptimeRobot/healthchecks.io)
-- [ ] Boot-time предупреждение: scheduler enabled + липсващ `ANTHROPIC_API_KEY`
-      сега гърми чак в 07:00 (тихо), вместо при старт
-- [ ] `docker build` smoke — Dockerfile-ът никога не е build-ван реално
-
-**Анализ 3 — продуктови липси (за сайта):**
-- [ ] Webhook/събитие към сайта при publish — сайтът да не polling-ва `/api/posts`
-- [ ] FTS5 търсене endpoint (`/api/posts/search?q=`) — SQLite го дава безплатно
-- [ ] Двуезични постове (напр. bg за сайта + en за LinkedIn) — сега `POSTS_LANGUAGE`
-      е един за всички канали; става per-generator конфигурация
-- [ ] RSS feed на самия kiko (`/feed.xml`) — агрегаторът иронично няма собствен фийд
+### Следващи (от "Дълбок анализ за 11/10")
+- [ ] OpenAPI спецификация (`@fastify/swagger`) — route schemas вече ги има,
+      генерирането е малка стъпка
+- [ ] ESLint (type-checked) + Prettier + гейт в CI
+- [ ] Coverage (c8) + праг; unit тестове за LLM слоя (synthesizer/generators
+      с mock client — изисква clientFactory injection)
+- [ ] Golden-set eval: фиксиран набор items → synthesis → автоматичен скоринг
+      (изисква API ключ)
+- [ ] pino-pretty в dev (сега JSON логове навсякъде)
+- [ ] Пълна zod валидация на config (строгият int() покри typo случая)
+- [ ] Litestream continuous replication (db:backup покрива базовия случай)
+- [ ] Pinned base image digest + trivy scan в CI; multi-arch (amd64 + arm64)
 - [ ] OG image генерация за постовете (споделяемост)
 - [ ] Analytics feedback loop — кои постове/теми работят, за да се тунира промптът
-
-### Дълбок анализ за 11/10 (2026-06-12)
-
-Изводи от четене на целия сорс (не генерични съвети). Предпоставка: блокерите от
-"Троен анализ" по-горе (git+CI, реален LLM run, docker smoke) са преди всичко тук.
-
-**Надеждност / recovery:**
-- [ ] Boot-time sweep на забити run-ове — умре ли процесът по средата, редът в `runs`
-      остава `running` завинаги (guard-ът е in-memory, рестартът го губи):
-      `UPDATE runs SET status='error', error='interrupted' WHERE status='running'`
-- [ ] Graceful shutdown да маркира/изчаква текущия run — сега `process.exit(0)` в
-      `index.ts` убива LLM call по средата; + `sqlite.close()` за чист WAL checkpoint
-- [ ] Изрични `timeout`/`maxRetries` на Anthropic клиента — adaptive thinking +
-      16k max_tokens е потенциално дълъг call; SDK дефолтите не са тунинговани
-      за непривиден batch pipeline
-- [ ] Catch-up run при boot — сървър down в 07:00 значи без digest до утре; ако
-      последният успешен run е по-стар от cron интервала → trigger (съществуващите
-      guards пазят от двоен token spend)
-
-**Сигурност:**
-- [ ] `requireAuth`: timing-safe сравнение (`crypto.timingSafeEqual`) вместо `!==`
-      на bearer токена
-- [ ] Fastify JSON schema валидация на query/params — сега ръчни guards;
-      `/api/news?status=каквото-и-да-е` минава мълчаливо; schema дава и бърза
-      сериализация безплатно
-
-**API контракт (сайтът е отделен проект — трябва му договор):**
-- [ ] OpenAPI спецификация (`@fastify/swagger`) — генерира се от schema валидацията
-- [ ] Pagination metadata в `/api/posts` (`total`/`hasMore`) — гол масив не стига
-      за UI пагинация
-- [ ] Единен документиран error формат (сега ад-хок `{error: string}`)
-
-**Наблюдаемост:**
-- [ ] Един pino instance за Fastify и pipeline (сега два несвързани — `log.ts` и
-      Fastify logger); ниво от env, pretty в dev / JSON в prod
-- [ ] "Дълбок" `/health`: последен run (статус + възраст), следващ cron fire —
-      истинският liveness въпрос за cron-driven сървис е "тече ли pipeline-ът",
-      не "отговаря ли SELECT 1"
-
-**LLM качество (инженерно, не "на око"):**
-- [ ] Детерминистична citation проверка след synthesis (безплатна, без LLM):
-      всяко `[n]` в body да резолвва към реален source (n ≤ брой клъстери);
-      счупена референция → warn/fail преди запис
-- [ ] Golden-set eval: фиксиран набор items → synthesis → автоматичен скоринг
-      (всяко твърдение цитирано? без изпуснати source-ове?) — без това промпт
-      промените са нефалсифицируеми
-- [ ] Prompt versioning: hash/версия на промпта в `posts`/`runs` — качеството да
-      се корелира с промпт редакции
-
-**Качествени гейтове:**
-- [ ] ESLint (type-checked) + Prettier + гейт в CI (върви с git init от
-      операционния анализ)
-- [ ] Coverage (c8) + праг; unit тестове за `formatClustersForPrompt` и
-      generator-ите с mock client — LLM слоят сега е с 0% покритие
-- [ ] Zod-валидиран config при boot — `int()` мълчаливо подменя typo с дефолт;
-      невалиден `PIPELINE_CRON` гърми чак при schedule, не при старт
-- [ ] Dependabot/Renovate + `npm audit` гейт в CI
-
-**Deploy (надграждане над docker build smoke):**
-- [ ] `docker-compose.yml` — volume, env_file, restart policy; по-късно Litestream
-      sidecar за backup-а
-- [ ] Pinned base image digest + trivy scan в CI; multi-arch (amd64 + arm64)
 
 ### Бек лог (когато потрябва)
 - [ ] Batches API за LLM извикванията (−50% цена) — при нарастване на обема
@@ -113,6 +42,48 @@
 ---
 
 ## DONE
+
+### 2026-06-12 — TODO файлът изработен (троен анализ + дълбок анализ 11/10)
+**Функционални:**
+- [x] `POST /api/posts/:id/regenerate?kind=` — нов канален пост от съществуващ digest,
+      без нов synthesis (клъстерите се реконструират от stored sources)
+- [x] Webhook известия (`WEBHOOK_URL`): `run.error`, `run.partial`, `post.published`
+- [x] Персистентни feed validators — `feed_validators` таблица, `FeedValidatorStore`
+      порт, DB-backed имплементация (in-memory остава дефолт за тестове)
+
+**Надеждност / recovery:**
+- [x] Boot-time sweep: забити `running` run-ове → `error: interrupted by restart`
+- [x] Graceful shutdown: изчаква активния run до 30s + `sqlite.close()` (чист WAL)
+- [x] Изрични `timeout` (10 min) / `maxRetries` (3) на Anthropic клиента (env tunable)
+- [x] Catch-up run при boot ако последният run е по-стар от `CATCH_UP_HOURS` (26h
+      дефолт; пали се само при наличен API ключ)
+- [x] Boot warning: scheduler enabled без ANTHROPIC ключ
+
+**Сигурност / API контракт:**
+- [x] `requireAuth` с `crypto.timingSafeEqual`
+- [x] Fastify JSON schema валидация на всички query/params (енуми, мин/макс, дефолти)
+- [x] Pagination metadata: `total`/`limit`/`offset`/`hasMore` в `/api/posts`
+- [x] Единен error формат `{error, statusCode}` (setErrorHandler + setNotFoundHandler)
+
+**Наблюдаемост / LLM качество:**
+- [x] Един pino root instance — HTTP е child на pipeline логера; `LOG_LEVEL` env
+- [x] Дълбок `/health`: lastRun (статус/възраст), nextScheduledRun, pipelineRunning
+- [x] Детерминистична citation проверка след synthesis (warn при счупено `[n]`)
+- [x] Prompt versioning: sha256 hash на system промпта в `posts.prompt_version`
+- [x] Строг config: невалидна числова env стойност гърми при boot (не тих дефолт)
+
+**Продуктови:**
+- [x] FTS5 търсене: `GET /api/posts/search?q=` (виртуална таблица + триггери + rebuild)
+- [x] Двуезични постове: `SITE_LANGUAGE` / `LINKEDIN_LANGUAGE` per-generator
+- [x] Собствен RSS: `GET /feed.xml` (published site постове, XML-escaped)
+
+**Операционни:**
+- [x] `git init` (main) + `.git/info/exclude` за AI файловете + initial commit (52 файла)
+- [x] CI workflow (.github/workflows/ci.yml): typecheck + test + build + npm audit
+- [x] Dependabot (npm weekly групирано + GitHub Actions monthly)
+- [x] `docker-compose.yml` (volume, env_file, restart policy)
+- [x] `npm run db:backup` — online SQLite backup (SQLite backup API, безопасен при работа)
+- [x] Тестове: 38/38 (нови: citations, search, regenerate, schema validation)
 
 ### 2026-06-12 — Дийп ресърч: production hardening (имплементирано)
 - [x] SQLite production pragmas: `synchronous=NORMAL`, `busy_timeout=5000`,
