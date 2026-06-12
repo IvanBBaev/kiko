@@ -97,7 +97,7 @@ npm run dev            # server + scheduler
 npm run ingest         # feeds → DB only, no LLM calls (zero tokens)
 npm run pipeline       # full one-off pipeline run from the CLI
 npm run test           # unit + integration tests (node:test, in-memory SQLite)
-npm run test:coverage  # с8 coverage report
+npm run test:coverage  # c8 coverage report with ratchet thresholds
 npm run typecheck
 npm run lint           # eslint (type-checked)
 npm run format         # prettier --write
