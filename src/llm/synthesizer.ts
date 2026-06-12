@@ -54,8 +54,11 @@ export function formatClustersForPrompt(clusters: StoryCluster[]): string {
  * model decide how much to reason about grouping/ranking.
  */
 export class ClaudeSynthesizer implements DigestSynthesizer {
+  // Factory keeps construction lazy (no API key needed at boot) and injectable in tests.
+  constructor(private readonly clientFactory: () => ReturnType<typeof getAnthropicClient> = getAnthropicClient) {}
+
   async synthesize(clusters: StoryCluster[]): Promise<SynthesisOutcome> {
-    const client = getAnthropicClient();
+    const client = this.clientFactory();
 
     const response = await client.messages.parse({
       model: config.llm.model,

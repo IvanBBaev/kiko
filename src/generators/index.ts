@@ -9,7 +9,4 @@ import { SitePostGenerator } from './site.js';
  * still publish. Any class implementing the PostGenerator port works
  * (X/Twitter, newsletter, Mastodon…).
  */
-export const postGenerators: PostGenerator[] = [
-  new SitePostGenerator(),
-  new LinkedInPostGenerator(),
-];
+export const postGenerators: PostGenerator[] = [new SitePostGenerator(), new LinkedInPostGenerator()];

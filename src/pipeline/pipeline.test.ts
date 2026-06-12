@@ -133,7 +133,10 @@ describe('Pipeline', () => {
 
     const allPosts = await db.select().from(posts);
     assert.equal(allPosts.length, 2);
-    assert.ok(allPosts.every((p) => p.sources !== null), 'posts carry the [n] citation source mapping');
+    assert.ok(
+      allPosts.every((p) => p.sources !== null),
+      'posts carry the [n] citation source mapping',
+    );
 
     const pending = await new NewsRepository().selectPending(100);
     assert.equal(pending.length, 0, 'items are marked digested');

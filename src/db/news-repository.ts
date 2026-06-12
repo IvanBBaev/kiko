@@ -23,7 +23,12 @@ export class NewsRepository {
     const existing = await this.database
       .select({ hash: newsItems.contentHash })
       .from(newsItems)
-      .where(inArray(newsItems.contentHash, candidates.map((c) => c.contentHash)));
+      .where(
+        inArray(
+          newsItems.contentHash,
+          candidates.map((c) => c.contentHash),
+        ),
+      );
     const existingHashes = new Set(existing.map((r) => r.hash));
 
     const fresh = candidates.filter((c) => !existingHashes.has(c.contentHash));

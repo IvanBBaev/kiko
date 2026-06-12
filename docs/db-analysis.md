@@ -5,14 +5,14 @@ with a defined migration path to PostgreSQL. Rationale below.
 
 ## Workload profile (what we're actually choosing a DB for)
 
-| Dimension | Reality |
-|---|---|
-| Write volume | ~100–200 news-item inserts/day, 2 posts/day, a handful of run rows. One writer (the pipeline), never concurrent writes. |
-| Read volume | Site API: read-mostly list/detail queries, trivially cacheable (posts change twice a day). |
-| Data shape | Small, fully relational: `news_items` → `posts` (via id list), `runs`. JSON-ish fields (hashtags, item ids) are fine as TEXT. |
-| Size horizon | Years of operation ≈ tens of MB. Never approaches any engine's limits. |
-| Consistency needs | Single-node ACID is plenty; no distributed transactions, no multi-region. |
-| Team/ops | Solo project, no DBA, should run on the cheapest possible host. |
+| Dimension         | Reality                                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Write volume      | ~100–200 news-item inserts/day, 2 posts/day, a handful of run rows. One writer (the pipeline), never concurrent writes.       |
+| Read volume       | Site API: read-mostly list/detail queries, trivially cacheable (posts change twice a day).                                    |
+| Data shape        | Small, fully relational: `news_items` → `posts` (via id list), `runs`. JSON-ish fields (hashtags, item ids) are fine as TEXT. |
+| Size horizon      | Years of operation ≈ tens of MB. Never approaches any engine's limits.                                                        |
+| Consistency needs | Single-node ACID is plenty; no distributed transactions, no multi-region.                                                     |
+| Team/ops          | Solo project, no DBA, should run on the cheapest possible host.                                                               |
 
 This is a textbook small OLTP workload with a single writer — the deciding factors are
 **operational overhead** and **future feature needs** (search, embeddings), not raw
@@ -54,23 +54,23 @@ capability.
 
 ### Rejected
 
-| Engine | Why not |
-|---|---|
-| MySQL/MariaDB | No advantage over Postgres for this workload; weaker vector/FTS ecosystem. If we outgrow SQLite, Postgres is the better target. |
-| MongoDB | Data is relational and stable-schema; document flexibility solves a problem we don't have, and we'd lose easy joins/aggregates (`/api/usage`). |
-| DuckDB | OLAP engine — brilliant for analytics over many rows, wrong for an OLTP API serving single-row lookups. |
+| Engine             | Why not                                                                                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MySQL/MariaDB      | No advantage over Postgres for this workload; weaker vector/FTS ecosystem. If we outgrow SQLite, Postgres is the better target.                      |
+| MongoDB            | Data is relational and stable-schema; document flexibility solves a problem we don't have, and we'd lose easy joins/aggregates (`/api/usage`).       |
+| DuckDB             | OLAP engine — brilliant for analytics over many rows, wrong for an OLTP API serving single-row lookups.                                              |
 | Redis (as primary) | Not a durable system of record; would still need a real DB behind it. As a cache it's unnecessary — posts change twice a day, HTTP caching suffices. |
 
 ## Decision matrix
 
-| Criterion (weight) | SQLite | Postgres | Turso/libSQL | MongoDB |
-|---|---|---|---|---|
-| Ops overhead (high) | ●●● | ● | ●● | ● |
-| Fit for single-writer OLTP (high) | ●●● | ●●● | ●●● | ●● |
-| Cost at this scale (high) | ●●● | ● | ●● | ● |
-| Search/vector future (med) | ●● | ●●● | ●● | ●● |
-| Multi-instance scaling (low today) | ● | ●●● | ●●● | ●●● |
-| Migration friction later (med) | ●●● (via drizzle) | n/a | ●●● | ● |
+| Criterion (weight)                 | SQLite            | Postgres | Turso/libSQL | MongoDB |
+| ---------------------------------- | ----------------- | -------- | ------------ | ------- |
+| Ops overhead (high)                | ●●●               | ●        | ●●           | ●       |
+| Fit for single-writer OLTP (high)  | ●●●               | ●●●      | ●●●          | ●●      |
+| Cost at this scale (high)          | ●●●               | ●        | ●●           | ●       |
+| Search/vector future (med)         | ●●                | ●●●      | ●●           | ●●      |
+| Multi-instance scaling (low today) | ●                 | ●●●      | ●●●          | ●●●     |
+| Migration friction later (med)     | ●●● (via drizzle) | n/a      | ●●●          | ●       |
 
 ## Triggers to revisit (move to Postgres — or Turso if serverless)
 

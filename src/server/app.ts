@@ -2,6 +2,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import swagger from '@fastify/swagger';
 import { config } from '../config.js';
 import { log } from '../log.js';
 import { registerRoutes } from './routes.js';
@@ -27,6 +28,17 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(helmet, { global: true });
   await app.register(rateLimit, { max: config.rateLimitMax, timeWindow: '1 minute' });
   await app.register(cors, { origin: config.corsOrigins });
+
+  // OpenAPI spec generated from the route schemas — the site team's contract.
+  await app.register(swagger, {
+    openapi: {
+      info: { title: 'kiko API', description: 'AI news digests and channel posts', version: '0.1.0' },
+    },
+  });
+
   await registerRoutes(app);
+
+  app.get('/openapi.json', { schema: { hide: true } }, async () => app.swagger());
+
   return app;
 }

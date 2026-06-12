@@ -17,11 +17,7 @@ export class PostsRepository {
   async ensureUniqueSlug(base: string): Promise<string> {
     let slug = base;
     for (let n = 2; ; n++) {
-      const existing = await this.database
-        .select({ id: posts.id })
-        .from(posts)
-        .where(eq(posts.slug, slug))
-        .limit(1);
+      const existing = await this.database.select({ id: posts.id }).from(posts).where(eq(posts.slug, slug)).limit(1);
       if (existing.length === 0) return slug;
       slug = `${base}-${n}`;
     }

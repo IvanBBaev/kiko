@@ -33,15 +33,15 @@ serves them over a REST API (the site consuming it is a separate, future project
 Everything pluggable sits behind an interface in [src/core/ports.ts](src/core/ports.ts);
 concrete implementations are wired in exactly one place — [src/container.ts](src/container.ts).
 
-| Module | Role | Plug-in point |
-|---|---|---|
-| `core/` | Domain types, ports, pure logic (dedupe, clustering) | — |
-| `sources/` | `NewsSource` implementations (RSS today) | **[sources/index.ts](src/sources/index.ts)** — add/remove a line |
-| `llm/` | Anthropic client + `DigestSynthesizer` | swap in container |
-| `generators/` | `PostGenerator` per output channel (site, LinkedIn) | **[generators/index.ts](src/generators/index.ts)** — add/remove a line |
-| `db/` | Drizzle schema + repository classes | — |
-| `pipeline/` | `Pipeline` class — orchestration only, all deps injected | — |
-| `server/`, `cli/`, `scheduler` | Delivery mechanisms over the same container | — |
+| Module                         | Role                                                     | Plug-in point                                                          |
+| ------------------------------ | -------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `core/`                        | Domain types, ports, pure logic (dedupe, clustering)     | —                                                                      |
+| `sources/`                     | `NewsSource` implementations (RSS today)                 | **[sources/index.ts](src/sources/index.ts)** — add/remove a line       |
+| `llm/`                         | Anthropic client + `DigestSynthesizer`                   | swap in container                                                      |
+| `generators/`                  | `PostGenerator` per output channel (site, LinkedIn)      | **[generators/index.ts](src/generators/index.ts)** — add/remove a line |
+| `db/`                          | Drizzle schema + repository classes                      | —                                                                      |
+| `pipeline/`                    | `Pipeline` class — orchestration only, all deps injected | —                                                                      |
+| `server/`, `cli/`, `scheduler` | Delivery mechanisms over the same container              | —                                                                      |
 
 To add an output channel (e.g. X/Twitter): implement `PostGenerator` in
 `src/generators/x.ts`, add it to the registry array — done. Generators run
@@ -68,20 +68,20 @@ call, no tokens.
 
 ## API
 
-| Method | Path                        | Description                                  |
-|--------|-----------------------------|----------------------------------------------|
-| GET    | `/health`                   | Liveness + DB check + last run / next cron fire |
-| GET    | `/api/posts`                | List posts (`?kind&status&limit&offset`), pagination metadata |
-| GET    | `/api/posts/search`         | FTS5 full-text search (`?q=&limit=`)         |
-| GET    | `/api/posts/:id`            | Single post (sources resolve `[n]` citations to URLs) |
-| POST   | `/api/posts/:id/publish`    | Mark a post as published 🔒 (fires `post.published` webhook) |
-| POST   | `/api/posts/:id/unpublish`  | Back to draft 🔒                             |
+| Method | Path                        | Description                                                    |
+| ------ | --------------------------- | -------------------------------------------------------------- |
+| GET    | `/health`                   | Liveness + DB check + last run / next cron fire                |
+| GET    | `/api/posts`                | List posts (`?kind&status&limit&offset`), pagination metadata  |
+| GET    | `/api/posts/search`         | FTS5 full-text search (`?q=&limit=`)                           |
+| GET    | `/api/posts/:id`            | Single post (sources resolve `[n]` citations to URLs)          |
+| POST   | `/api/posts/:id/publish`    | Mark a post as published 🔒 (fires `post.published` webhook)   |
+| POST   | `/api/posts/:id/unpublish`  | Back to draft 🔒                                               |
 | POST   | `/api/posts/:id/regenerate` | New channel post from an existing digest (`?kind=linkedin`) 🔒 |
-| GET    | `/feed.xml`                 | RSS feed of published site posts             |
-| GET    | `/api/news`                 | Raw news items (`?status=new\|digested`)     |
-| POST   | `/api/pipeline/run`         | Trigger a pipeline run (202, background) 🔒  |
-| GET    | `/api/runs`                 | Last 20 pipeline runs (incl. token spend per run) |
-| GET    | `/api/usage`                | Aggregate token spend across all posts       |
+| GET    | `/feed.xml`                 | RSS feed of published site posts                               |
+| GET    | `/api/news`                 | Raw news items (`?status=new\|digested`)                       |
+| POST   | `/api/pipeline/run`         | Trigger a pipeline run (202, background) 🔒                    |
+| GET    | `/api/runs`                 | Last 20 pipeline runs (incl. token spend per run)              |
+| GET    | `/api/usage`                | Aggregate token spend across all posts                         |
 
 🔒 — when `API_TOKEN` is set, these require `Authorization: Bearer <token>`.
 Posts are created as `draft`; the site should query `?status=published`.
@@ -99,8 +99,14 @@ npm run dev            # server + scheduler
 npm run ingest         # feeds → DB only, no LLM calls (zero tokens)
 npm run pipeline       # full one-off pipeline run from the CLI
 npm run test           # unit + integration tests (node:test, in-memory SQLite)
+npm run test:coverage  # с8 coverage report
 npm run typecheck
+npm run lint           # eslint (type-checked)
+npm run format         # prettier --write
+npm run db:backup      # online SQLite backup into data/backups/
 ```
+
+OpenAPI spec: `GET /openapi.json` (generated from the route schemas).
 
 ### Docker
 

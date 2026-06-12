@@ -9,7 +9,10 @@ export function nextScheduledRun(): string | null {
   return job?.nextRun()?.toISOString() ?? null;
 }
 
-export function startScheduler(log: { info: (msg: string) => void; error: (obj: unknown, msg: string) => void }): Cron | null {
+export function startScheduler(log: {
+  info: (msg: string) => void;
+  error: (obj: unknown, msg: string) => void;
+}): Cron | null {
   if (!config.pipeline.scheduleEnabled) {
     log.info('Pipeline scheduler disabled (PIPELINE_SCHEDULE_ENABLED=false)');
     return null;

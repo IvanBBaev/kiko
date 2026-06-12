@@ -45,8 +45,11 @@ const LINKEDIN_PROMPT_VERSION = createHash('sha256').update(LINKEDIN_SYSTEM_PROM
 export class LinkedInPostGenerator implements PostGenerator {
   readonly kind = 'linkedin';
 
+  // Factory keeps construction lazy (no API key needed at boot) and injectable in tests.
+  constructor(private readonly clientFactory: () => ReturnType<typeof getAnthropicClient> = getAnthropicClient) {}
+
   async generate(synthesis: SynthesisOutcome, clusters: StoryCluster[]): Promise<GeneratedPost> {
-    const client = getAnthropicClient();
+    const client = this.clientFactory();
     const { post: digest } = synthesis;
 
     const sourceLinks = clusters.map((c, i) => `[${i + 1}] ${c.primary.url}`).join('\n');
