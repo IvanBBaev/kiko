@@ -123,6 +123,33 @@ const postEventBodySchema = {
   },
 } as const;
 
+// Editable fields only — slug (unique index), kind, status, itemIds, sources,
+// model, token counts and timestamps are never edited through this endpoint.
+// minProperties forbids a no-op PATCH; additionalProperties forbids editing
+// anything not listed. Lengths bound the payload.
+const patchPostBodySchema = {
+  type: 'object',
+  minProperties: 1,
+  additionalProperties: false,
+  properties: {
+    title: { type: 'string', maxLength: 300 },
+    summary: { type: 'string', maxLength: 1000 },
+    body: { type: 'string', maxLength: 100000 },
+    firstComment: { type: 'string', maxLength: 5000 },
+    hashtags: { type: 'array', maxItems: 10, items: { type: 'string', maxLength: 60 } },
+    topics: { type: 'array', maxItems: 10, items: { type: 'string', maxLength: 40 } },
+  },
+} as const;
+
+interface PatchPostBody {
+  title?: string;
+  summary?: string;
+  body?: string;
+  firstComment?: string;
+  hashtags?: string[];
+  topics?: string[];
+}
+
 interface ListPostsQuery {
   kind?: 'site' | 'linkedin';
   status?: 'draft' | 'published';
@@ -281,6 +308,36 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
         .returning({ id: posts.id, status: posts.status });
       if (updated.length === 0) return reply.code(404).send({ error: 'post not found' });
       return updated[0];
+    },
+  );
+
+  // Operator editing of generated drafts (and published posts) — the whole point
+  // of the draft workflow is to fix the LLM's output, not just accept/reject it.
+  // Auth-gated; only the listed fields are editable; the FTS triggers re-index
+  // title/summary/body on update so search stays consistent.
+  app.patch<{ Params: { id: number }; Body: PatchPostBody }>(
+    '/api/posts/:id',
+    { schema: { params: idParamsSchema, body: patchPostBodySchema }, preHandler: requireAuth },
+    async (req, reply) => {
+      const b = req.body;
+      const updates: Partial<typeof posts.$inferInsert> = {};
+      if (b.title !== undefined) updates.title = b.title;
+      if (b.summary !== undefined) updates.summary = b.summary;
+      if (b.body !== undefined) updates.body = b.body;
+      if (b.firstComment !== undefined) updates.firstComment = b.firstComment;
+      if (b.hashtags !== undefined) updates.hashtags = JSON.stringify(b.hashtags);
+      if (b.topics !== undefined) updates.topics = JSON.stringify(b.topics);
+
+      // Fastify strips unknown keys (removeAdditional), so a body of only
+      // non-editable fields arrives empty here — reject it rather than letting
+      // drizzle throw on an empty SET.
+      if (Object.keys(updates).length === 0) {
+        return reply.code(400).send({ error: 'no editable fields provided' });
+      }
+
+      const [updated] = await db.update(posts).set(updates).where(eq(posts.id, req.params.id)).returning();
+      if (!updated) return reply.code(404).send({ error: 'post not found' });
+      return serializePost(updated);
     },
   );
 

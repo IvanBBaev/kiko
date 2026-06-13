@@ -288,3 +288,70 @@ describe('engagement events + analytics', () => {
     );
   });
 });
+
+describe('PATCH /api/posts/:id (draft editing)', () => {
+  let editId: number;
+
+  before(async () => {
+    const [row] = await db
+      .insert(posts)
+      .values({
+        kind: 'site',
+        title: 'Editable draft',
+        slug: null,
+        summary: 's',
+        body: 'original body',
+        itemIds: '[1]',
+        model: 'test-model',
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+      })
+      .returning({ id: posts.id });
+    editId = row!.id;
+  });
+
+  it('requires auth', async () => {
+    const res = await app.inject({ method: 'PATCH', url: `/api/posts/${editId}`, payload: { title: 'x' } });
+    assert.equal(res.statusCode, 401);
+  });
+
+  it('rejects an empty body and unknown fields via schema', async () => {
+    const empty = await app.inject({ method: 'PATCH', url: `/api/posts/${editId}`, payload: {}, headers: AUTH });
+    assert.equal(empty.statusCode, 400, 'minProperties forbids a no-op patch');
+    const unknown = await app.inject({
+      method: 'PATCH',
+      url: `/api/posts/${editId}`,
+      payload: { slug: 'hacked' },
+      headers: AUTH,
+    });
+    assert.equal(unknown.statusCode, 400, 'slug is not editable');
+  });
+
+  it('404s a missing post', async () => {
+    const res = await app.inject({ method: 'PATCH', url: '/api/posts/99999', payload: { title: 'x' }, headers: AUTH });
+    assert.equal(res.statusCode, 404);
+  });
+
+  it('edits the listed fields and returns the serialized post', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/posts/${editId}`,
+      payload: { title: 'Edited title', topics: ['agents'], hashtags: ['#z'], body: 'edited zzunique body' },
+      headers: AUTH,
+    });
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.equal(body.title, 'Edited title');
+    assert.deepEqual(body.topics, ['agents']);
+    assert.deepEqual(body.hashtags, ['#z']);
+  });
+
+  it('re-indexes FTS on edit (the edited body is searchable)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/posts/search?q=zzunique', headers: AUTH });
+    assert.equal(res.statusCode, 200);
+    assert.ok(
+      res.json().posts.some((p: { id: number }) => p.id === editId),
+      'the FTS update trigger picked up the edited body',
+    );
+  });
+});
