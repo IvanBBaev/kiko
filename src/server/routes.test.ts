@@ -169,6 +169,19 @@ describe('slug uniqueness', () => {
   });
 });
 
+describe('AI-content disclosure', () => {
+  it('exposes aiGenerated + aiDisclosure on a serialized post', async () => {
+    const body = (await app.inject({ method: 'GET', url: '/api/posts/2' })).json();
+    assert.equal(body.aiGenerated, true);
+    assert.ok(typeof body.aiDisclosure === 'string' && body.aiDisclosure.length > 0);
+  });
+
+  it('carries the disclosure in the RSS channel description', async () => {
+    const res = await app.inject({ method: 'GET', url: '/feed.xml' });
+    assert.match(res.body, /<description>Synthesized AI news digests\. .+<\/description>/);
+  });
+});
+
 describe('topics taxonomy', () => {
   it('serializes topics as an array on a post', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/posts/2' });

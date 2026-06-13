@@ -111,7 +111,8 @@ export function buildCardElement(model: CardModel): OgElement {
     [
       box({ fontSize: 26, fontWeight: 700, color: '#7c9cff', letterSpacing: 1 }, `kiko · ${model.badge}`),
       box({ flexDirection: 'column', gap: 24 }, middle),
-      box({ fontSize: 24, fontWeight: 400, color: '#8893ad' }, model.footer),
+      // The footer always carries the AI-generated disclosure marker.
+      box({ fontSize: 24, fontWeight: 400, color: '#8893ad' }, `${model.footer} · AI-generated`),
     ],
   );
 }

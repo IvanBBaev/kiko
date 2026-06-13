@@ -25,6 +25,9 @@ function serializePost(row: Post): Record<string, unknown> {
     topics: row.topics ? (JSON.parse(row.topics) as string[]) : null,
     // Relative — the frontend builds the absolute og:image URL from its origin.
     ogImageUrl: ogImagePath(row.id),
+    // The body is AI-generated — surface the disclosure so the site can label it.
+    aiGenerated: true,
+    aiDisclosure: config.aiDisclosure,
   };
 }
 
@@ -355,7 +358,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   <channel>
     <title>kiko — AI news digest</title>
     <link>${xmlEscape(base)}</link>
-    <description>Synthesized AI news digests</description>
+    <description>${xmlEscape(`Synthesized AI news digests. ${config.aiDisclosure}`)}</description>
     <language>${xmlEscape(config.languages.site)}</language>
 ${items}
   </channel>

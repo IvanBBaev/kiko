@@ -86,6 +86,14 @@ export const config = {
   /** Public site base URL — used for links in /feed.xml. */
   publicSiteUrl: (process.env.PUBLIC_SITE_URL ?? '').replace(/\/$/, '') || null,
 
+  /**
+   * Disclosure text attached to every published artifact (API, feed, meta). The
+   * content is AI-generated, which must be labelled — EU AI Act Art. 50 and the
+   * synthetic-media rules of platforms like LinkedIn. Operator-overridable for
+   * wording/localization, but always present.
+   */
+  aiDisclosure: process.env.AI_DISCLOSURE ?? 'AI-generated from cited sources and reviewed before publishing.',
+
   pipeline: {
     cron: process.env.PIPELINE_CRON ?? '0 7 * * *',
     /** IANA timezone for the cron schedule; defaults to server-local time. */
