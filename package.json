@@ -27,6 +27,7 @@
     "pipeline": "tsx src/cli/run-pipeline.ts",
     "ingest": "tsx src/cli/ingest.ts",
     "db:backup": "tsx src/cli/backup.ts",
+    "eval": "tsx src/cli/eval.ts",
     "og:font": "node scripts/build-og-font.mjs"
   },
   "dependencies": {
