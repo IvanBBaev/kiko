@@ -167,3 +167,38 @@ describe('slug uniqueness', () => {
     assert.equal(await repo.ensureUniqueSlug('brand-new'), 'brand-new');
   });
 });
+
+describe('GET /og/posts/:id.png', () => {
+  const isPng = (buf: Buffer): boolean =>
+    buf.length > 1000 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+
+  it('renders a PNG card for a published post', async () => {
+    const res = await app.inject({ method: 'GET', url: '/og/posts/2.png' });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.headers['content-type'], 'image/png');
+    assert.match(res.headers['cache-control'] as string, /max-age=60/);
+    // helmet's same-origin default is overridden so the image embeds cross-origin.
+    assert.equal(res.headers['cross-origin-resource-policy'], 'cross-origin');
+    assert.ok(isPng(res.rawPayload), 'body is a PNG');
+  });
+
+  it('hides a draft card from the public but serves it to a trusted caller', async () => {
+    const anon = await app.inject({ method: 'GET', url: '/og/posts/1.png' });
+    assert.equal(anon.statusCode, 404);
+    const trusted = await app.inject({ method: 'GET', url: '/og/posts/1.png', headers: AUTH });
+    assert.equal(trusted.statusCode, 200);
+    assert.ok(isPng(trusted.rawPayload));
+    // A draft card rendered for a reviewer must not be publicly cacheable.
+    assert.equal(trusted.headers['cache-control'], undefined);
+  });
+
+  it('404s an unknown id', async () => {
+    const res = await app.inject({ method: 'GET', url: '/og/posts/9999.png' });
+    assert.equal(res.statusCode, 404);
+  });
+
+  it('exposes a relative ogImageUrl on serialized posts', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/posts/2' });
+    assert.equal(res.json().ogImageUrl, '/og/posts/2.png');
+  });
+});

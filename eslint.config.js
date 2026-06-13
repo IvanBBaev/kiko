@@ -3,7 +3,7 @@ import prettierConfig from 'eslint-config-prettier';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist/', 'node_modules/', 'data/'] },
+  { ignores: ['dist/', 'node_modules/', 'data/', 'src/og/font-data.ts'] },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {

@@ -35,7 +35,6 @@ need a deeper change or external infra:
       claim cited? no dropped sources?) — prompt changes are unfalsifiable
       without it. Requires an API key.
 - [ ] Litestream continuous replication (`db:backup` covers the basic case).
-- [ ] OG image generation for posts (shareability).
 - [ ] Analytics feedback loop — which posts/topics perform, to tune the prompt.
 
 ## Backlog (when needed)
@@ -53,3 +52,11 @@ need a deeper change or external infra:
       reject every value that can be wrong, so this is ergonomics, not coverage.
 - [ ] Publish kiko's own multi-arch image (buildx amd64+arm64) — only once there
       is a registry to push to; today the service is built from source via compose.
+- [ ] OG image server-side cache + ETag/304 — now rendered per request with a 60s
+      `Cache-Control` and the global rate limit; an LRU keyed by post id+status (or
+      an `updatedAt` column) would skip the recompute and add conditional GET.
+- [ ] Boot-time OG smoke render — surface a native-binary/libc mismatch at startup
+      (non-fatal warning) instead of on the first `/og/posts/:id.png` request.
+- [ ] Couple `*_LANGUAGE` to OG font coverage — validate the configured language
+      against the bundled subset (Latin/Greek/Cyrillic), or add a Noto fallback for
+      other scripts. Documented as a known limitation for now.

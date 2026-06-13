@@ -2,11 +2,18 @@ import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { config } from '../config.js';
-import { pipeline, runsRepo } from '../container.js';
+import { ogRenderer, pipeline, runsRepo } from '../container.js';
 import { db } from '../db/client.js';
 import { newsItems, posts, runs, type Post } from '../db/schema.js';
+import { postToCardData } from '../og/card.js';
 import { nextScheduledRun } from '../scheduler.js';
 import { notify } from '../notify.js';
+
+/** Canonical relative path of a post's OG card image — the one place this shape
+ *  is defined (the route below uses Fastify's `:id.png` param form of it). */
+function ogImagePath(id: number): string {
+  return `/og/posts/${id}.png`;
+}
 
 /** DB rows store JSON columns as strings — clients get them parsed. */
 function serializePost(row: Post): Record<string, unknown> {
@@ -15,6 +22,8 @@ function serializePost(row: Post): Record<string, unknown> {
     itemIds: JSON.parse(row.itemIds) as number[],
     sources: row.sources ? (JSON.parse(row.sources) as unknown[]) : null,
     hashtags: row.hashtags ? (JSON.parse(row.hashtags) as string[]) : null,
+    // Relative — the frontend builds the absolute og:image URL from its origin.
+    ogImageUrl: ogImagePath(row.id),
   };
 }
 
@@ -197,6 +206,31 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     if (!trusted) void reply.header('Cache-Control', 'public, max-age=60');
     return serializePost(row);
   });
+
+  // Open Graph card image (1200x630 PNG) for social/link previews. Same draft
+  // visibility as GET /api/posts/:id. A render failure propagates to the global
+  // error handler as a generic 500 (no detail leak), which is the honest status.
+  // hide:true keeps this binary endpoint out of the JSON OpenAPI contract, which
+  // could only mis-describe it as a JSON response.
+  app.get<{ Params: { id: number } }>(
+    '/og/posts/:id.png',
+    { schema: { params: idParamsSchema, hide: true } },
+    async (req, reply) => {
+      const [row] = await db.select().from(posts).where(eq(posts.id, req.params.id));
+      if (!row) return reply.code(404).send({ error: 'post not found' });
+      const trusted = isTrusted(req);
+      if (!trusted && row.status !== 'published') return reply.code(404).send({ error: 'post not found' });
+
+      const png = await ogRenderer.render(postToCardData(row));
+      // helmet defaults Cross-Origin-Resource-Policy to same-origin, which would
+      // block a browser on the frontend's origin from embedding this <img>.
+      void reply.header('Content-Type', 'image/png').header('Cross-Origin-Resource-Policy', 'cross-origin');
+      // Only published cards (all an untrusted caller can reach) are publicly
+      // cacheable; a draft rendered for a trusted reviewer must not be cached.
+      if (!trusted) void reply.header('Cache-Control', 'public, max-age=60');
+      return reply.send(png);
+    },
+  );
 
   app.post<{ Params: { id: number } }>(
     '/api/posts/:id/publish',

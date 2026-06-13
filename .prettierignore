@@ -5,3 +5,5 @@ package-lock.json
 WORKLOG.md
 coverage/
 CLAUDE.md
+src/og/font-data.ts
+docs/licenses/

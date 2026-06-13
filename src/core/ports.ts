@@ -1,4 +1,4 @@
-import type { FetchedItem, GeneratedPost, StoryCluster, SynthesisOutcome } from './types.js';
+import type { FetchedItem, GeneratedPost, OgCardData, StoryCluster, SynthesisOutcome } from './types.js';
 
 export interface FetchOptions {
   maxAgeDays: number;
@@ -39,4 +39,14 @@ export interface DigestSynthesizer {
 export interface PostGenerator {
   readonly kind: string;
   generate(synthesis: SynthesisOutcome, clusters: StoryCluster[]): Promise<GeneratedPost>;
+}
+
+/**
+ * Renders a post's Open Graph card to a PNG (1200x630). Pluggable so the
+ * rendering stack can be swapped; wired in src/container.ts and served by the
+ * /og/posts/:id.png route. render() returns the raw PNG bytes.
+ */
+export interface OgImageRenderer {
+  readonly name: string;
+  render(card: OgCardData): Promise<Buffer>;
 }

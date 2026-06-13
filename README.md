@@ -72,6 +72,7 @@ call, no tokens.
 | GET    | `/api/posts`                | List posts (`?kind&status&limit&offset`), pagination metadata  |
 | GET    | `/api/posts/search`         | FTS5 full-text search (`?q=&limit=`)                           |
 | GET    | `/api/posts/:id`            | Single post (sources resolve `[n]` citations to URLs)          |
+| GET    | `/og/posts/:id.png`         | Open Graph card image (1200×630 PNG) for link previews         |
 | POST   | `/api/posts/:id/publish`    | Mark a post as published 🔒 (fires `post.published` webhook)   |
 | POST   | `/api/posts/:id/unpublish`  | Back to draft 🔒                                               |
 | POST   | `/api/posts/:id/regenerate` | New channel post from an existing digest (`?kind=linkedin`) 🔒 |
@@ -102,9 +103,39 @@ npm run typecheck
 npm run lint           # eslint (type-checked)
 npm run format         # prettier --write
 npm run db:backup      # online SQLite backup into data/backups/
+npm run og:font        # regenerate the vendored OG-card font (needs fonttools)
 ```
 
 OpenAPI spec: `GET /openapi.json` (generated from the route schemas).
+
+### Open Graph images
+
+`GET /og/posts/:id.png` renders a 1200×630 card (title, summary, source count,
+date) for social/link previews. It follows the same draft visibility as the
+JSON post route — unpublished posts are `404` to the public. Rendering is
+on-the-fly with [satori](https://github.com/vercel/satori) (layout + text → SVG
+`<path>`, so output never depends on a system font) rasterized to PNG by
+[`@resvg/resvg-js`](https://github.com/yisibl/resvg-js); both ship prebuilt
+binaries for linux x64/arm64 and macOS, so the Docker image needs no fonts or
+build tools (CI builds and Trivy-scans the image on linux/amd64). The card font
+is a subset of [Inter](https://rsms.me/inter/) (OFL-1.1, see
+[docs/licenses/Inter-OFL.txt](docs/licenses/Inter-OFL.txt)) vendored as base64
+in `src/og/font-data.ts`; regenerate it with `npm run og:font` (needs `python3`
+with `fonttools`). The subset covers **Latin, Greek and Cyrillic** — a post title
+in another script (e.g. Arabic, Hebrew, CJK) renders with missing glyphs, so widen
+the subset ranges in `scripts/build-og-font.mjs` before setting a `*_LANGUAGE` to
+such a language.
+
+Each serialized post carries a relative `ogImageUrl`; the frontend builds the
+absolute URL from its own origin and emits the meta tags:
+
+```html
+<meta property="og:image" content="{ORIGIN}/og/posts/{id}.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:type" content="image/png" />
+<meta name="twitter:card" content="summary_large_image" />
+```
 
 ### Docker
 

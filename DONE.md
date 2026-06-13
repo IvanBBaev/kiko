@@ -2,6 +2,27 @@
 
 Completed work, newest first. Active items live in [TODO.md](TODO.md).
 
+## 2026-06-13 — Open Graph card images
+
+- [x] **`GET /og/posts/:id.png`** — on-the-fly 1200×630 PNG link-preview card per
+      post (title, summary, source count, date). New `OgImageRenderer` port
+      (`src/core/ports.ts`) + `SatoriOgRenderer` adapter (`src/og/`), wired in
+      `container.ts`; pure, fully-tested card model in `src/og/card.ts`. Stack:
+      satori (text → SVG `<path>`, so rendering never depends on a system font) +
+      `@resvg/resvg-js` → PNG, both with prebuilt linux x64/arm64 + macOS binaries
+      (zero Dockerfile diff). Font: Inter subset (Latin/Greek/Cyrillic, OFL-1.1)
+      vendored as base64 in `font-data.ts` via the reproducible `npm run og:font`.
+      Same draft visibility as the JSON route; serialized posts gain a relative
+      `ogImageUrl`. Design chosen via a judge-panel workflow; stack de-risked with
+      a render spike before coding.
+- [x] **Adversarial self-review** (workflow, 5 angles → verify): fixed draft cards
+      being publicly cacheable (Cache-Control now gated on `!trusted`), per-channel
+      date locale, code-point-safe title clamp (no split surrogates), defensive
+      `sources` JSON parse, keyed badge with a default, binary route hidden from the
+      JSON OpenAPI contract, and the OFL license shipped inside the Docker image.
+      Deferred (backlog): server-side OG cache/ETag, boot smoke render, language↔font
+      coupling. Gate green: 106 tests, coverage 91.6 / 84.1 / 92.4.
+
 ## 2026-06-13 — Config enum validation + image supply chain
 
 - [x] **Config enums validated at boot** (`eea006d`): a strict `oneOf()` helper

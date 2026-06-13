@@ -15,6 +15,9 @@ WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
+# The OG-card font (vendored in dist/og/font-data.js) is Inter under OFL-1.1,
+# which requires the license to travel with the font in every distribution.
+COPY docs/licenses ./docs/licenses
 RUN mkdir -p /app/data && chown -R node:node /app
 USER node
 VOLUME /app/data

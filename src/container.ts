@@ -7,6 +7,7 @@ import { PostsRepository } from './db/posts-repository.js';
 import { RunsRepository } from './db/runs-repository.js';
 import { postGenerators } from './generators/index.js';
 import { ClaudeSynthesizer } from './llm/synthesizer.js';
+import { SatoriOgRenderer } from './og/satori-renderer.js';
 import { Pipeline } from './pipeline/pipeline.js';
 import { buildNewsSources } from './sources/index.js';
 
@@ -14,6 +15,7 @@ export const newsRepo = new NewsRepository();
 export const postsRepo = new PostsRepository();
 export const runsRepo = new RunsRepository();
 export const feedValidatorsRepo = new FeedValidatorsRepository();
+export const ogRenderer = new SatoriOgRenderer();
 
 export const pipeline = new Pipeline({
   sources: buildNewsSources(feedValidatorsRepo),

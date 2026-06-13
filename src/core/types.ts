@@ -49,6 +49,16 @@ export interface SynthesisOutcome {
   promptVersion: string | null;
 }
 
+/** The minimal post data an OG-card image is rendered from (channel-agnostic). */
+export interface OgCardData {
+  title: string | null;
+  summary: string | null;
+  kind: string;
+  sourceCount: number;
+  /** ISO-8601 creation timestamp. */
+  createdAt: string;
+}
+
 /** Maps an inline [n] citation in a post body to its source story. */
 export interface PostSourceRef {
   n: number;
