@@ -2,6 +2,37 @@
 
 Completed work, newest first. Active items live in [TODO.md](TODO.md).
 
+## 2026-06-13 — Code review fixes (28 of 30 findings, two recall passes)
+
+Worked in five gated batches; each ran `npm run check` green before committing.
+Tests grew 46 → 78.
+
+- [x] **Batch A — pipeline atomicity** (`604cc16`): `PostsRepository.commitDigest`
+      writes the site post and marks its items digested in one transaction; the
+      'site' post gates the run (a lost digest leaves items `new` to retry, never
+      a duplicate); synthesis tokens are recorded on ok/partial/error alike.
+      (R1a–R1d)
+- [x] **Batch B — config/boot validation** (`d5920a6`): `int()` rejects
+      non-integers and sub-minimum values; `bool()` accepts true/false/1/0/yes/no/
+      on/off and throws otherwise; min ≤ max asserted; an invalid `PIPELINE_CRON`
+      disables the scheduler instead of crashing boot. (R2a–R2d)
+- [x] **Batch C — lifecycle** (`0ce59ee`): restart sweep moved off db module-load
+      into `sweepInterruptedRuns()` (CLIs no longer flip a live run); shutdown
+      only closes the DB when no run is mid-write; catch-up fires on a recent
+      errored run, not just an overdue timestamp. (L1–L3, R3a-adjacent)
+- [x] **Batch D — public API** (`2f0da53`): drafts hidden from unauthenticated
+      callers (list/detail/search); 5xx messages no longer leak driver detail;
+      `trustProxy` configurable; `/health` exempt from rate limiting; `/feed.xml`
+      strips XML-illegal control chars and emits an absolute link; `regenerate`
+      can't target `site`; public cache cut to 60s. (A1–A6, A7 mitigated)
+- [x] **Batch E — sanitization/dates/FTS** (`7d3c9ac`): LLM slugs slugified;
+      citation regex `\d+`; ingest dedupe keys on url too; `selectPending` orders
+      by coalesce(publishedAt, fetchedAt); future-dated items no longer lead;
+      FTS backfill detects a freshly-created index instead of the dead count
+      comparison. (R3a, S1–S4)
+
+Residuals tracked in TODO.md: R3b (drizzle-kit migrations) and A7 (CDN purge).
+
 ## 2026-06-12 — repo-standard pass
 
 - [x] History hygiene: AI attribution trailer stripped (tree verified
