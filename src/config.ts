@@ -38,20 +38,35 @@ export function bool(name: string, value: string | undefined, fallback: boolean)
   throw new Error(`Invalid ${name}: "${value}" is not a boolean (use true/false/1/0/yes/no/on/off)`);
 }
 
+/**
+ * Strict enum env parsing: the value must be one of `allowed`, else a config
+ * error at boot rather than a confusing failure later (e.g. an invalid log level
+ * reaching pino, or an effort the model API rejects mid-run).
+ */
+export function oneOf<T extends string>(
+  name: string,
+  value: string | undefined,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  if (value === undefined || value === '') return fallback;
+  if ((allowed as readonly string[]).includes(value)) return value as T;
+  throw new Error(`Invalid ${name}: "${value}" — expected one of: ${allowed.join(', ')}`);
+}
+
 export type Effort = 'low' | 'medium' | 'high' | 'max';
 
-const VALID_EFFORTS: readonly string[] = ['low', 'medium', 'high', 'max'];
-const effort = process.env.LLM_EFFORT ?? 'high';
-if (!VALID_EFFORTS.includes(effort)) {
-  throw new Error(`Invalid LLM_EFFORT "${effort}" — expected one of: ${VALID_EFFORTS.join(', ')}`);
-}
+const EFFORTS = ['low', 'medium', 'high', 'max'] as const;
+const effort = oneOf('LLM_EFFORT', process.env.LLM_EFFORT, EFFORTS, 'high');
+
+const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'] as const;
 
 const baseLanguage = process.env.POSTS_LANGUAGE ?? 'en';
 
 export const config = {
   port: int('PORT', process.env.PORT, 3000, 1),
   dbPath: process.env.DB_PATH ?? './data/kiko.db',
-  logLevel: process.env.LOG_LEVEL ?? 'info',
+  logLevel: oneOf('LOG_LEVEL', process.env.LOG_LEVEL, LOG_LEVELS, 'info'),
 
   /** When set, mutating endpoints require "Authorization: Bearer <token>". */
   apiToken: process.env.API_TOKEN || null,
@@ -86,7 +101,7 @@ export const config = {
 
   llm: {
     model: process.env.ANTHROPIC_MODEL ?? 'claude-opus-4-8',
-    effort: effort as Effort,
+    effort,
     // Adaptive-thinking tokens count toward max_tokens — keep generous headroom.
     maxOutputTokens: int('LLM_MAX_OUTPUT_TOKENS', process.env.LLM_MAX_OUTPUT_TOKENS, 16000),
     /** Per-request timeout; synthesis with adaptive thinking can run minutes. */

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { bool, int } from './config.js';
+import { bool, int, oneOf } from './config.js';
 
 describe('int', () => {
   it('returns the fallback for unset/empty', () => {
@@ -36,5 +36,22 @@ describe('bool', () => {
 
   it('throws on an unrecognized value instead of silently coercing to false', () => {
     assert.throws(() => bool('FLAG', 'maybe', false), /not a boolean/);
+  });
+});
+
+describe('oneOf', () => {
+  const levels = ['info', 'warn', 'error'] as const;
+
+  it('returns the fallback for unset/empty', () => {
+    assert.equal(oneOf('X', undefined, levels, 'info'), 'info');
+    assert.equal(oneOf('X', '', levels, 'warn'), 'warn');
+  });
+
+  it('accepts an allowed value', () => {
+    assert.equal(oneOf('X', 'error', levels, 'info'), 'error');
+  });
+
+  it('throws on a value outside the set', () => {
+    assert.throws(() => oneOf('LOG_LEVEL', 'verbose', levels, 'info'), /expected one of/);
   });
 });
