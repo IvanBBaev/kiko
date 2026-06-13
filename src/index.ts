@@ -1,11 +1,17 @@
 import { config } from './config.js';
 import { pipeline, runsRepo } from './container.js';
-import { sqlite } from './db/client.js';
+import { sqlite, sweepInterruptedRuns } from './db/client.js';
 import { hasAnthropicCredentials } from './llm/client.js';
+import { shouldCatchUp } from './pipeline/catch-up.js';
 import { buildApp } from './server/app.js';
 import { startScheduler } from './scheduler.js';
 
 const app = await buildApp();
+
+// Server boot: repair any run a crashed process left 'running'. Done here (not
+// at db module load) so CLIs that share the database don't touch a live run.
+sweepInterruptedRuns();
+
 const job = startScheduler(app.log);
 
 if (config.pipeline.scheduleEnabled && !hasAnthropicCredentials()) {
@@ -14,14 +20,14 @@ if (config.pipeline.scheduleEnabled && !hasAnthropicCredentials()) {
   );
 }
 
-// Catch-up: if the server was down when cron should have fired, run now
-// instead of waiting up to a full day for the next occurrence. The dedupe and
-// min-stories guards make a redundant catch-up run cost zero tokens.
-if (config.pipeline.scheduleEnabled && config.pipeline.catchUpHours > 0 && hasAnthropicCredentials()) {
+// Catch-up: if the server was down (or crashed) when cron should have fired, run
+// now instead of waiting up to a full day. Fire when the latest run is overdue
+// OR errored — a recent crashed run (just swept above) still owes us a digest.
+// Dedupe + the min-stories guard make a redundant catch-up cost zero tokens.
+if (config.pipeline.scheduleEnabled && hasAnthropicCredentials()) {
   const latest = await runsRepo.latest();
-  const threshold = Date.now() - config.pipeline.catchUpHours * 60 * 60 * 1000;
-  if (!latest || new Date(latest.startedAt).getTime() < threshold) {
-    app.log.info('Last pipeline run is overdue — starting catch-up run');
+  if (shouldCatchUp(latest, config.pipeline.catchUpHours, Date.now())) {
+    app.log.info({ lastRunStatus: latest?.status ?? null }, 'starting catch-up pipeline run');
     void pipeline.run().catch((err) => app.log.error({ err }, 'catch-up pipeline run failed'));
   }
 }
@@ -40,11 +46,15 @@ async function shutdown(signal: string): Promise<void> {
   while (pipeline.isRunning() && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  if (pipeline.isRunning()) {
-    app.log.warn('Pipeline still running at shutdown deadline — exiting anyway (run will be swept on next boot)');
-  }
 
-  sqlite.close(); // clean WAL checkpoint
+  // Only checkpoint+close the DB if no run is mid-write — closing under an
+  // in-flight write would fail that write. If still running past the deadline,
+  // leave the DB open and let the process exit; the run is swept next boot.
+  if (pipeline.isRunning()) {
+    app.log.warn('Pipeline still running at shutdown deadline — leaving DB open, exiting (run swept next boot)');
+  } else {
+    sqlite.close(); // clean WAL checkpoint
+  }
   process.exit(0);
 }
 process.once('SIGINT', () => void shutdown('SIGINT'));

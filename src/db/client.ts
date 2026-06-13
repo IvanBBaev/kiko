@@ -110,10 +110,16 @@ if (ftsCount !== postsCount) {
   sqlite.exec(`INSERT INTO posts_fts(posts_fts) VALUES('rebuild')`);
 }
 
-// A run left 'running' means the process died mid-run (the concurrency guard
-// is in-memory) — sweep it to 'error' so /api/runs reflects reality.
-sqlite.exec(`UPDATE runs SET status = 'error', error = 'interrupted by restart', finished_at = datetime('now')
-  WHERE status = 'running'`);
+/**
+ * Repair runs left 'running' by a crashed process (the concurrency guard is
+ * in-memory, so a kill leaves the row stuck). **Server-boot only** — this must
+ * NOT run at module load, because the backup/ingest CLIs also import this file
+ * and would otherwise flip a live server's in-flight run to 'error'.
+ */
+export function sweepInterruptedRuns(): void {
+  sqlite.exec(`UPDATE runs SET status = 'error', error = 'interrupted by restart', finished_at = datetime('now')
+    WHERE status = 'running'`);
+}
 
 export { sqlite };
 export const db = drizzle(sqlite, { schema });
