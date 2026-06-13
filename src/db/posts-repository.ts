@@ -44,6 +44,7 @@ export class PostsRepository {
       body: post.body,
       firstComment: post.firstComment,
       hashtags: post.hashtags ? JSON.stringify(post.hashtags) : null,
+      topics: post.topics ? JSON.stringify(post.topics) : null,
       itemIds: JSON.stringify(meta.itemIds),
       sources: JSON.stringify(meta.sources),
       model: meta.model,

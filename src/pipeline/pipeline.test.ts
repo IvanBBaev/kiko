@@ -46,7 +46,7 @@ function fakeSource(items: FetchedItem[]): NewsSource {
 const fakeSynthesizer = {
   async synthesize(): Promise<SynthesisOutcome> {
     return {
-      post: { title: 'Digest', slug: 'digest', summary: 'sum', body: 'body [1]' },
+      post: { title: 'Digest', slug: 'digest', summary: 'sum', body: 'body [1]', topics: ['models'] },
       usage: usage(1000, 500),
       promptVersion: 'test-v1',
     };
@@ -64,6 +64,7 @@ function okGenerator(kind: string): PostGenerator {
       body: synthesis.post.body,
       firstComment: null,
       hashtags: null,
+      topics: kind === 'site' ? synthesis.post.topics : null,
       usage: kind === 'site' ? synthesis.usage : usage(200, 100),
       promptVersion: synthesis.promptVersion,
     }),

@@ -98,6 +98,9 @@ export class LinkedInPostGenerator implements PostGenerator {
       body: parsed.text,
       firstComment: parsed.firstComment,
       hashtags: parsed.hashtags,
+      // Inherit the digest's topics so a LinkedIn post shares the same browse
+      // dimension as its source digest.
+      topics: digest.topics,
       usage: extractUsage(response.usage),
       promptVersion: LINKEDIN_PROMPT_VERSION,
     };

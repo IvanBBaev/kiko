@@ -6,7 +6,7 @@ import type { StoryCluster, SynthesisOutcome } from '../core/types.js';
 import { LinkedInPostGenerator } from './linkedin.js';
 
 const synthesis: SynthesisOutcome = {
-  post: { title: 'Digest', slug: 'digest', summary: 'sum', body: 'Body [1]' },
+  post: { title: 'Digest', slug: 'digest', summary: 'sum', body: 'Body [1]', topics: ['models'] },
   usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
   promptVersion: 'synth-v1',
 };

@@ -38,6 +38,8 @@ export const posts = sqliteTable(
     firstComment: text('first_comment'),
     /** JSON array of hashtags (linkedin) */
     hashtags: text('hashtags'),
+    /** JSON array of topic tags — browse/feed/analytics dimension */
+    topics: text('topics'),
     model: text('model').notNull(),
     /** Hash of the system prompt that produced this post */
     promptVersion: text('prompt_version'),

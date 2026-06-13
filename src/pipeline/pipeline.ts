@@ -248,6 +248,7 @@ export class Pipeline {
         slug: source.slug ?? '',
         summary: source.summary ?? '',
         body: source.body,
+        topics: source.topics ? (JSON.parse(source.topics) as string[]) : [],
       },
       usage: ZERO_USAGE,
       promptVersion: source.promptVersion,

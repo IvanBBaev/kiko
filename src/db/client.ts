@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS posts (
   sources TEXT,
   first_comment TEXT,
   hashtags TEXT,
+  topics TEXT,
   model TEXT NOT NULL,
   input_tokens INTEGER NOT NULL DEFAULT 0,
   output_tokens INTEGER NOT NULL DEFAULT 0,
@@ -117,6 +118,7 @@ ensureColumn('runs', 'input_tokens', 'input_tokens INTEGER NOT NULL DEFAULT 0');
 ensureColumn('runs', 'output_tokens', 'output_tokens INTEGER NOT NULL DEFAULT 0');
 ensureColumn('posts', 'sources', 'sources TEXT');
 ensureColumn('posts', 'prompt_version', 'prompt_version TEXT');
+ensureColumn('posts', 'topics', 'topics TEXT');
 
 // Backfill the FTS index once if it was just created on a DB that already had
 // posts. (The old count(*) comparison was dead code: an external-content FTS5

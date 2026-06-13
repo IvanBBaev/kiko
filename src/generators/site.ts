@@ -18,6 +18,7 @@ export class SitePostGenerator implements PostGenerator {
       body: post.body,
       firstComment: null,
       hashtags: null,
+      topics: post.topics,
       usage,
       promptVersion,
     };

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { config } from '../config.js';
 import type { DigestSynthesizer } from '../core/ports.js';
-import { SitePostSchema, type StoryCluster, type SynthesisOutcome } from '../core/types.js';
+import { CANONICAL_TOPICS, SitePostSchema, type StoryCluster, type SynthesisOutcome } from '../core/types.js';
 import { extractUsage, getAnthropicClient } from './client.js';
 
 // Token-budget note: this system prompt is well below the minimum cacheable
@@ -22,6 +22,7 @@ Editorial rules:
 - A story listed with multiple sources was independently covered — that's a signal of significance, cite it once.
 - Skip items that are pure marketing or not genuinely newsworthy — fewer, stronger sections beat full coverage.
 - Audience: technical professionals who follow AI; assume baseline knowledge, skip 101 explanations.
+- Tag the digest with 2-5 topics. Reuse these canonical tags so topics stay groupable across days: ${CANONICAL_TOPICS.join(', ')}. Only introduce a new tag when none of these fit.
 
 Write the post in language: ${config.languages.site}.`;
 

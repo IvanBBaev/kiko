@@ -27,6 +27,24 @@ export interface UsageTotals {
   cacheWriteTokens: number;
 }
 
+/**
+ * Canonical topic tags. The synthesizer is steered to reuse these so topics stay
+ * a groupable dimension (per-topic feeds, topic-level analytics, browse/SEO)
+ * instead of free-form sprawl. A new tag is allowed only when none fit.
+ */
+export const CANONICAL_TOPICS = [
+  'models',
+  'research',
+  'funding',
+  'policy',
+  'safety',
+  'tooling',
+  'open-source',
+  'hardware',
+  'product',
+  'agents',
+] as const;
+
 // NOTE: keep length constraints in descriptions/prompts, not in zod
 // (min/max length is not supported by structured outputs server-side).
 export const SitePostSchema = z.object({
@@ -38,6 +56,12 @@ export const SitePostSchema = z.object({
     .describe(
       'Markdown body. TL;DR bullet list first, then thematic H2 sections. ' +
         'Reference sources inline as [n] matching the numbered input items. 600-900 words.',
+    ),
+  topics: z
+    .array(z.string())
+    .describe(
+      `2-5 short lowercase topic tags categorizing the digest. Strongly prefer these canonical tags so ` +
+        `posts stay groupable: ${CANONICAL_TOPICS.join(', ')}. Add a different tag only when none of these fit.`,
     ),
 });
 export type SitePost = z.infer<typeof SitePostSchema>;
@@ -77,6 +101,8 @@ export interface GeneratedPost {
   body: string;
   firstComment: string | null;
   hashtags: string[] | null;
+  /** Topic tags for browse/feeds/analytics; null when a channel doesn't tag. */
+  topics: string[] | null;
   usage: UsageTotals;
   /** Hash of the prompt that produced it — correlate quality with prompt edits. */
   promptVersion: string | null;

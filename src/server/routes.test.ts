@@ -36,6 +36,7 @@ before(async () => {
       summary: 'pub',
       body: 'pub body',
       itemIds: '[2]',
+      topics: JSON.stringify(['models', 'research']),
       model: 'test-model',
       status: 'published',
       createdAt: new Date().toISOString(),
@@ -165,6 +166,30 @@ describe('slug uniqueness', () => {
     const repo = new PostsRepository();
     assert.equal(await repo.ensureUniqueSlug('test-digest'), 'test-digest-2');
     assert.equal(await repo.ensureUniqueSlug('brand-new'), 'brand-new');
+  });
+});
+
+describe('topics taxonomy', () => {
+  it('serializes topics as an array on a post', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/posts/2' });
+    assert.deepEqual(res.json().topics, ['models', 'research']);
+  });
+
+  it('filters the post list by ?topic', async () => {
+    const hit = await app.inject({ method: 'GET', url: '/api/posts?topic=models' });
+    assert.equal(hit.json().posts.length, 1);
+    assert.equal(hit.json().posts[0].id, 2);
+    const miss = await app.inject({ method: 'GET', url: '/api/posts?topic=nonexistent' });
+    assert.equal(miss.json().posts.length, 0);
+  });
+
+  it('filters the RSS feed by ?topic and emits <category> tags', async () => {
+    const res = await app.inject({ method: 'GET', url: '/feed.xml?topic=models' });
+    assert.equal(res.statusCode, 200);
+    assert.match(res.body, /<category>models<\/category>/);
+    assert.match(res.body, /Published digest/);
+    const miss = await app.inject({ method: 'GET', url: '/feed.xml?topic=nonexistent' });
+    assert.doesNotMatch(miss.body, /Published digest/);
   });
 });
 

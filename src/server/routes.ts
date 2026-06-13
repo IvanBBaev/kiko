@@ -22,6 +22,7 @@ function serializePost(row: Post): Record<string, unknown> {
     itemIds: JSON.parse(row.itemIds) as number[],
     sources: row.sources ? (JSON.parse(row.sources) as unknown[]) : null,
     hashtags: row.hashtags ? (JSON.parse(row.hashtags) as string[]) : null,
+    topics: row.topics ? (JSON.parse(row.topics) as string[]) : null,
     // Relative — the frontend builds the absolute og:image URL from its origin.
     ogImageUrl: ogImagePath(row.id),
   };
@@ -77,6 +78,7 @@ const listPostsQuerySchema = {
   properties: {
     kind: { type: 'string', enum: ['site', 'linkedin'] },
     status: { type: 'string', enum: ['draft', 'published'] },
+    topic: { type: 'string', maxLength: 40 },
     limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
     offset: { type: 'integer', minimum: 0, default: 0 },
   },
@@ -121,8 +123,15 @@ const postEventBodySchema = {
 interface ListPostsQuery {
   kind?: 'site' | 'linkedin';
   status?: 'draft' | 'published';
+  topic?: string;
   limit: number;
   offset: number;
+}
+
+/** SQL predicate: a post's topics JSON array contains `topic`. Null-safe via
+ *  coalesce to an empty array, so untagged posts simply never match. */
+function topicFilter(topic: string) {
+  return sql`EXISTS (SELECT 1 FROM json_each(coalesce(${posts.topics}, '[]')) WHERE value = ${topic})`;
 }
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
@@ -156,11 +165,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     '/api/posts',
     { schema: { querystring: listPostsQuerySchema } },
     async (req, reply) => {
-      const { kind, status, limit, offset } = req.query;
+      const { kind, status, topic, limit, offset } = req.query;
       const trusted = isTrusted(req);
 
       const filters = [];
       if (kind) filters.push(eq(posts.kind, kind));
+      if (topic) filters.push(topicFilter(topic));
       // Untrusted callers only ever see published posts; drafts are unreviewed
       // LLM output. A trusted (Bearer) caller may filter by status for review.
       if (!trusted) filters.push(eq(posts.status, 'published'));
@@ -305,34 +315,42 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // --- Own RSS feed (published site posts) ---
-  app.get('/feed.xml', async (req, reply) => {
-    const rows = await db
-      .select()
-      .from(posts)
-      .where(and(eq(posts.kind, 'site'), eq(posts.status, 'published')))
-      .orderBy(desc(posts.createdAt))
-      .limit(20);
+  // --- Own RSS feed (published site posts), optionally filtered by ?topic ---
+  app.get<{ Querystring: { topic?: string } }>(
+    '/feed.xml',
+    { schema: { querystring: { type: 'object', properties: { topic: { type: 'string', maxLength: 40 } } } } },
+    async (req, reply) => {
+      const topic = req.query.topic;
+      const rows = await db
+        .select()
+        .from(posts)
+        .where(and(eq(posts.kind, 'site'), eq(posts.status, 'published'), topic ? topicFilter(topic) : undefined))
+        .orderBy(desc(posts.createdAt))
+        .limit(20);
 
-    // RSS links must be absolute. Use the configured public site URL, else
-    // derive an absolute base from the request (honours trustProxy headers).
-    const base = config.publicSiteUrl ?? `${req.protocol}://${req.hostname}`;
-    const items = rows
-      .map((p) => {
-        const link = p.slug ? `${base}/posts/${p.slug}` : `${base}/api/posts/${p.id}`;
-        return [
-          '    <item>',
-          `      <title>${xmlEscape(p.title ?? 'Untitled')}</title>`,
-          `      <link>${xmlEscape(link)}</link>`,
-          `      <guid isPermaLink="false">kiko-post-${p.id}</guid>`,
-          `      <pubDate>${new Date(p.createdAt).toUTCString()}</pubDate>`,
-          `      <description>${xmlEscape(p.summary ?? '')}</description>`,
-          '    </item>',
-        ].join('\n');
-      })
-      .join('\n');
+      // RSS links must be absolute. Use the configured public site URL, else
+      // derive an absolute base from the request (honours trustProxy headers).
+      const base = config.publicSiteUrl ?? `${req.protocol}://${req.hostname}`;
+      const items = rows
+        .map((p) => {
+          const link = p.slug ? `${base}/posts/${p.slug}` : `${base}/api/posts/${p.id}`;
+          const topics = (p.topics ? (JSON.parse(p.topics) as string[]) : [])
+            .map((t) => `      <category>${xmlEscape(t)}</category>`)
+            .join('\n');
+          return [
+            '    <item>',
+            `      <title>${xmlEscape(p.title ?? 'Untitled')}</title>`,
+            `      <link>${xmlEscape(link)}</link>`,
+            `      <guid isPermaLink="false">kiko-post-${p.id}</guid>`,
+            `      <pubDate>${new Date(p.createdAt).toUTCString()}</pubDate>`,
+            `      <description>${xmlEscape(p.summary ?? '')}</description>`,
+            ...(topics ? [topics] : []),
+            '    </item>',
+          ].join('\n');
+        })
+        .join('\n');
 
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
     <title>kiko — AI news digest</title>
@@ -343,11 +361,12 @@ ${items}
   </channel>
 </rss>`;
 
-    return reply
-      .header('Content-Type', 'application/rss+xml; charset=utf-8')
-      .header('Cache-Control', 'public, max-age=60')
-      .send(xml);
-  });
+      return reply
+        .header('Content-Type', 'application/rss+xml; charset=utf-8')
+        .header('Cache-Control', 'public, max-age=60')
+        .send(xml);
+    },
+  );
 
   // --- News items (debugging / curation) ---
   app.get<{ Querystring: { status?: string; limit: number } }>(
