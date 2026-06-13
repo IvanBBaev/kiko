@@ -17,3 +17,12 @@ updates:
     groups:
       actions-all:
         patterns: ['*']
+  # Keeps the digest-pinned base image in the Dockerfile current.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      docker-all:
+        patterns: ['*']

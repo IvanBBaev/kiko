@@ -21,3 +21,20 @@ jobs:
         run: npm run check
       - name: Audit production dependencies (high+)
         run: npm audit --omit=dev --audit-level=high
+
+  # Builds the image (a smoke test that the multi-stage Dockerfile assembles)
+  # and scans the built image for known OS/base-layer CVEs — the npm audit
+  # above only covers the JS dependency tree, not the node:22-slim base.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build image
+        run: docker build -t kiko:ci .
+      - name: Scan image for vulnerabilities (Trivy, HIGH+CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: kiko:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
