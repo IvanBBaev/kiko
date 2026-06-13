@@ -475,12 +475,13 @@ ${items}
 
   // --- Engagement analytics (feedback loop for tuning content) ---
   app.get('/api/analytics', async () => {
-    const [totalEvents, byType, bySource, topPosts] = await Promise.all([
+    const [totalEvents, funnel, byType, bySource, topPosts] = await Promise.all([
       eventsRepo.total(),
+      eventsRepo.funnel(),
       eventsRepo.byType(),
       eventsRepo.bySource(),
       eventsRepo.topPosts(20),
     ]);
-    return { totalEvents, byType, bySource, topPosts };
+    return { totalEvents, funnel, byType, bySource, topPosts };
   });
 }

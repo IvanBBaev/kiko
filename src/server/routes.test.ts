@@ -277,6 +277,9 @@ describe('engagement events + analytics', () => {
     assert.equal(res.statusCode, 200);
     const body = res.json();
     assert.equal(body.totalEvents, 1);
+    assert.equal(body.funnel.views, 1);
+    assert.equal(body.funnel.impressions, 0);
+    assert.equal(body.funnel.ctr, 0, 'no impressions → CTR is 0, not NaN');
     const types = new Map(body.byType.map((r: { type: string; count: number }) => [r.type, r.count]));
     assert.equal(types.get('view'), 1);
     assert.equal(types.get('click'), undefined, 'the draft-only click is not surfaced');
