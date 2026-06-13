@@ -76,7 +76,9 @@ export class RssSource implements NewsSource {
     });
 
     const feed = await parser.parseString(await response.text());
-    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const cutoff = now - maxAgeDays * 24 * 60 * 60 * 1000;
+    const futureSkew = now + 60 * 60 * 1000; // tolerate 1h of clock skew
     const items: FetchedItem[] = [];
 
     for (const item of feed.items ?? []) {
@@ -84,7 +86,11 @@ export class RssSource implements NewsSource {
       const url = item.link?.trim();
       if (!title || !url) continue;
 
-      const publishedAt = safeIsoDate(item.isoDate) ?? safeIsoDate(item.pubDate);
+      let publishedAt = safeIsoDate(item.isoDate) ?? safeIsoDate(item.pubDate);
+      // A future-dated item would otherwise sort first and lead the digest as
+      // citation [1]. Treat clearly-future dates as undated (ordering then falls
+      // back to fetch time) rather than letting bad data dominate.
+      if (publishedAt && new Date(publishedAt).getTime() > futureSkew) publishedAt = null;
       if (publishedAt && new Date(publishedAt).getTime() < cutoff) continue;
 
       const rawSummary = item.contentSnippet ?? item.content ?? '';

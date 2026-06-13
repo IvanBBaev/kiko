@@ -5,7 +5,9 @@
  */
 export function findInvalidCitations(body: string, sourceCount: number): number[] {
   const invalid = new Set<number>();
-  for (const match of body.matchAll(/\[(\d{1,3})\]/g)) {
+  // \d+ (not \d{1,3}) so a 4+-digit ref like [1234] is range-checked, not
+  // silently treated as valid because the pattern never matched it.
+  for (const match of body.matchAll(/\[(\d+)\]/g)) {
     const n = Number(match[1]);
     if (n < 1 || n > sourceCount) invalid.add(n);
   }

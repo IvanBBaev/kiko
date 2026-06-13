@@ -16,6 +16,12 @@ sqlite.pragma('busy_timeout = 5000');
 sqlite.pragma('cache_size = -20000'); // 20MB page cache
 sqlite.pragma('foreign_keys = ON');
 
+// Did the FTS index exist before this boot? If not, and posts already have rows
+// (the index was introduced on a populated DB), it must be backfilled once — the
+// triggers only index NEW mutations. Checked before the CREATE below.
+const ftsExistedBefore =
+  sqlite.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'posts_fts'`).get() !== undefined;
+
 // Bootstrap DDL — keep in sync with schema.ts. Good enough until the schema
 // stabilizes; switch to drizzle-kit migrations when it does.
 sqlite.exec(`
@@ -102,12 +108,15 @@ ensureColumn('runs', 'output_tokens', 'output_tokens INTEGER NOT NULL DEFAULT 0'
 ensureColumn('posts', 'sources', 'sources TEXT');
 ensureColumn('posts', 'prompt_version', 'prompt_version TEXT');
 
-// Rebuild the FTS index if it drifted from the posts table (e.g. the FTS table
-// was introduced after posts already existed).
-const ftsCount = (sqlite.prepare('SELECT count(*) AS c FROM posts_fts').get() as { c: number }).c;
-const postsCount = (sqlite.prepare('SELECT count(*) AS c FROM posts').get() as { c: number }).c;
-if (ftsCount !== postsCount) {
-  sqlite.exec(`INSERT INTO posts_fts(posts_fts) VALUES('rebuild')`);
+// Backfill the FTS index once if it was just created on a DB that already had
+// posts. (The old count(*) comparison was dead code: an external-content FTS5
+// table answers count(*) from the content table, so the two counts are always
+// equal even when the index is genuinely empty.)
+if (!ftsExistedBefore) {
+  const postsCount = (sqlite.prepare('SELECT count(*) AS c FROM posts').get() as { c: number }).c;
+  if (postsCount > 0) {
+    sqlite.exec(`INSERT INTO posts_fts(posts_fts) VALUES('rebuild')`);
+  }
 }
 
 /**

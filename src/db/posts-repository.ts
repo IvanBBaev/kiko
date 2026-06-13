@@ -1,7 +1,14 @@
 import { eq, inArray } from 'drizzle-orm';
+import { slugify } from '../core/slugify.js';
 import type { GeneratedPost, PostSourceRef } from '../core/types.js';
 import { db } from './client.js';
 import { newsItems, posts } from './schema.js';
+
+/** Slugify the LLM-provided slug; fall back to 'post' if nothing usable remains. */
+function baseSlug(raw: string | null): string | null {
+  if (!raw) return null;
+  return slugify(raw) || 'post';
+}
 
 export interface PostMeta {
   itemIds: number[];
@@ -50,7 +57,8 @@ export class PostsRepository {
   }
 
   async insert(post: GeneratedPost, meta: PostMeta): Promise<number> {
-    const slug = post.slug ? await this.ensureUniqueSlug(post.slug) : null;
+    const base = baseSlug(post.slug);
+    const slug = base ? await this.ensureUniqueSlug(base) : null;
     const [inserted] = await this.database
       .insert(posts)
       .values(this.rowValues(post, meta, slug))
@@ -67,14 +75,16 @@ export class PostsRepository {
    */
   async commitDigest(post: GeneratedPost, meta: PostMeta): Promise<number> {
     return this.database.transaction((tx) => {
+      const base = baseSlug(post.slug);
       let slug: string | null = null;
-      if (post.slug) {
-        slug = post.slug;
+      if (base) {
+        let current = base;
         for (let n = 2; ; n++) {
-          const taken = tx.select({ id: posts.id }).from(posts).where(eq(posts.slug, slug)).limit(1).all();
+          const taken = tx.select({ id: posts.id }).from(posts).where(eq(posts.slug, current)).limit(1).all();
           if (taken.length === 0) break;
-          slug = `${post.slug}-${n}`;
+          current = `${base}-${n}`;
         }
+        slug = current;
       }
       const inserted = tx
         .insert(posts)

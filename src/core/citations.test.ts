@@ -18,4 +18,8 @@ describe('findInvalidCitations', () => {
   it('handles bodies with no citations', () => {
     assert.deepEqual(findInvalidCitations('No refs here.', 5), []);
   });
+
+  it('flags a 4+-digit out-of-range reference (regression for \\d{1,3})', () => {
+    assert.deepEqual(findInvalidCitations('see [1234] and [5]', 3), [5, 1234]);
+  });
 });
