@@ -198,4 +198,44 @@ describe('Pipeline', () => {
     const pipeline = makePipeline([fakeSource([])], [okGenerator('site'), okGenerator('linkedin')]);
     assert.equal(await pipeline.regenerate(9999, 'linkedin'), null);
   });
+
+  it('site (primary) generator failure errors the run, keeps items new, records synthesis tokens', async () => {
+    await resetDb();
+    const failingSite: PostGenerator = {
+      kind: 'site',
+      generate: async () => {
+        throw new Error('boom');
+      },
+    };
+    const pipeline = makePipeline(
+      [fakeSource([fetchedItem(1), fetchedItem(2), fetchedItem(3)])],
+      [failingSite, okGenerator('linkedin')],
+    );
+    await assert.rejects(() => pipeline.run(), /site: boom/);
+
+    // The digest never persisted, so items must stay 'new' for a retry.
+    const pending = await new NewsRepository().selectPending(100);
+    assert.ok(pending.length >= 3, 'items stay new so the digest is retried');
+    const allPosts = await db.select().from(posts);
+    assert.equal(allPosts.length, 0, 'no post persisted and linkedin never ran');
+
+    // The already-paid synthesis spend is recorded on the error run.
+    const [run] = await db.select().from(runs);
+    assert.equal(run!.status, 'error');
+    assert.equal(run!.inputTokens, 1000);
+    assert.equal(run!.outputTokens, 500);
+  });
+
+  it('commitDigest is atomic: items are digested exactly when the site post exists', async () => {
+    await resetDb();
+    const pipeline = makePipeline(
+      [fakeSource([fetchedItem(1), fetchedItem(2), fetchedItem(3)])],
+      [okGenerator('site')],
+    );
+    await pipeline.run();
+    const sitePosts = (await db.select().from(posts)).filter((p) => p.kind === 'site');
+    assert.equal(sitePosts.length, 1);
+    const pending = await new NewsRepository().selectPending(100);
+    assert.equal(pending.length, 0);
+  });
 });

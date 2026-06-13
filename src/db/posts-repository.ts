@@ -1,7 +1,7 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { GeneratedPost, PostSourceRef } from '../core/types.js';
 import { db } from './client.js';
-import { posts } from './schema.js';
+import { newsItems, posts } from './schema.js';
 
 export interface PostMeta {
   itemIds: number[];
@@ -28,28 +28,63 @@ export class PostsRepository {
     return row ?? null;
   }
 
+  private rowValues(post: GeneratedPost, meta: PostMeta, slug: string | null) {
+    return {
+      kind: post.kind,
+      title: post.title,
+      slug,
+      summary: post.summary,
+      body: post.body,
+      firstComment: post.firstComment,
+      hashtags: post.hashtags ? JSON.stringify(post.hashtags) : null,
+      itemIds: JSON.stringify(meta.itemIds),
+      sources: JSON.stringify(meta.sources),
+      model: meta.model,
+      promptVersion: post.promptVersion,
+      inputTokens: post.usage.inputTokens,
+      outputTokens: post.usage.outputTokens,
+      cacheReadTokens: post.usage.cacheReadTokens,
+      cacheWriteTokens: post.usage.cacheWriteTokens,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
   async insert(post: GeneratedPost, meta: PostMeta): Promise<number> {
+    const slug = post.slug ? await this.ensureUniqueSlug(post.slug) : null;
     const [inserted] = await this.database
       .insert(posts)
-      .values({
-        kind: post.kind,
-        title: post.title,
-        slug: post.slug ? await this.ensureUniqueSlug(post.slug) : null,
-        summary: post.summary,
-        body: post.body,
-        firstComment: post.firstComment,
-        hashtags: post.hashtags ? JSON.stringify(post.hashtags) : null,
-        itemIds: JSON.stringify(meta.itemIds),
-        sources: JSON.stringify(meta.sources),
-        model: meta.model,
-        promptVersion: post.promptVersion,
-        inputTokens: post.usage.inputTokens,
-        outputTokens: post.usage.outputTokens,
-        cacheReadTokens: post.usage.cacheReadTokens,
-        cacheWriteTokens: post.usage.cacheWriteTokens,
-        createdAt: new Date().toISOString(),
-      })
+      .values(this.rowValues(post, meta, slug))
       .returning({ id: posts.id });
     return inserted!.id;
+  }
+
+  /**
+   * Atomically persist the canonical digest post AND mark its source items
+   * digested, in one transaction. Without this a crash between the two writes
+   * could commit the post while items stay 'new' — re-synthesizing and
+   * duplicating the digest on the next run. better-sqlite3 transactions are
+   * synchronous, so the whole body runs inside one BEGIN/COMMIT.
+   */
+  async commitDigest(post: GeneratedPost, meta: PostMeta): Promise<number> {
+    return this.database.transaction((tx) => {
+      let slug: string | null = null;
+      if (post.slug) {
+        slug = post.slug;
+        for (let n = 2; ; n++) {
+          const taken = tx.select({ id: posts.id }).from(posts).where(eq(posts.slug, slug)).limit(1).all();
+          if (taken.length === 0) break;
+          slug = `${post.slug}-${n}`;
+        }
+      }
+      const inserted = tx
+        .insert(posts)
+        .values(this.rowValues(post, meta, slug))
+        .returning({ id: posts.id })
+        .all();
+      if (meta.itemIds.length > 0) {
+        tx.update(newsItems).set({ status: 'digested' }).where(inArray(newsItems.id, meta.itemIds)).run();
+      }
+      return inserted[0]!.id;
+    });
   }
 }

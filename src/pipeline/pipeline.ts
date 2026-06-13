@@ -90,9 +90,14 @@ export class Pipeline {
     const runId = await runsRepo.start();
     log.info({ runId }, 'pipeline run started');
 
+    // Hoisted so the error path can record what the run already did/paid.
+    let itemsFetched = 0;
+    let itemsNew = 0;
+    let synthesisUsage: UsageTotals | null = null;
+
     try {
       // 1. Ingest
-      const { itemsFetched, itemsNew } = await this.ingest();
+      ({ itemsFetched, itemsNew } = await this.ingest());
 
       // 2. Select 2x the digest cap — clustering compresses multi-source
       // coverage, so more stories fit the same budget. Stories cut by the cap
@@ -109,6 +114,7 @@ export class Pipeline {
 
       // 3. Synthesize the digest (the expensive call)
       const synthesis = await synthesizer.synthesize(clusters);
+      synthesisUsage = synthesis.usage;
 
       // Deterministic citation check — every [n] must point at a real story.
       const invalidRefs = findInvalidCitations(synthesis.post.body, clusters.length);
@@ -125,30 +131,41 @@ export class Pipeline {
         alsoCoveredBy: c.duplicates.map((d) => d.source),
       }));
 
-      // 4. Run every registered output channel; independent failures.
-      let postsCreated = 0;
-      let firstError: string | null = null;
-      let inputTokens = 0;
-      let outputTokens = 0;
+      // The 'site' post IS the canonical digest; the synthesis usage is attributed
+      // to it. Secondary channels (LinkedIn, …) derive from it. The synthesis is
+      // already paid, so its cost is the run's baseline regardless of what fails.
+      const primary = generators.find((g) => g.kind === 'site') ?? generators[0];
+      if (!primary) throw new Error('no post generators registered');
 
+      let inputTokens = synthesis.usage.inputTokens;
+      let outputTokens = synthesis.usage.outputTokens;
+
+      // 4a. Persist the canonical digest AND mark items digested atomically. If
+      // it fails, items stay 'new' and the whole digest is retried next run —
+      // we never mark digested without the digest itself durably stored.
+      try {
+        const sitePost = await primary.generate(synthesis, clusters);
+        await postsRepo.commitDigest(sitePost, { itemIds, sources: sourceRefs, model: options.model });
+      } catch (err) {
+        throw new Error(`${primary.kind}: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+      }
+
+      // 4b. Secondary output channels — best-effort; a failure yields 'partial'
+      // but never re-runs synthesis (the digest is already committed).
+      let postsCreated = 1;
+      let firstError: string | null = null;
       for (const generator of generators) {
+        if (generator === primary) continue;
         try {
           const post = await generator.generate(synthesis, clusters);
           await postsRepo.insert(post, { itemIds, sources: sourceRefs, model: options.model });
           postsCreated++;
           inputTokens += post.usage.inputTokens;
           outputTokens += post.usage.outputTokens;
-          // Synthesis is paid for — once one post exists, these items must
-          // not re-enter the next run.
-          if (postsCreated === 1) await newsRepo.markDigested(itemIds);
         } catch (err) {
           firstError ??= `${generator.kind}: ${err instanceof Error ? err.message : String(err)}`;
           log.error({ err, generator: generator.kind }, 'post generator failed');
         }
-      }
-
-      if (postsCreated === 0) {
-        throw new Error(firstError ?? 'all post generators failed');
       }
 
       const status = firstError ? 'partial' : 'ok';
@@ -166,7 +183,18 @@ export class Pipeline {
       return { runId, status, itemsFetched, itemsNew, postsCreated };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await runsRepo.finish(runId, { status: 'error', error: message });
+      // Record what the run already did and paid (a successful-but-unpersisted
+      // synthesis is real spend that must stay visible), so the error row isn't
+      // a bare 0/0 that hides a billed Opus call.
+      await runsRepo.finish(runId, {
+        status: 'error',
+        itemsFetched,
+        itemsNew,
+        error: message,
+        ...(synthesisUsage
+          ? { inputTokens: synthesisUsage.inputTokens, outputTokens: synthesisUsage.outputTokens }
+          : {}),
+      });
       notify('run.error', { runId, error: message });
       throw err;
     } finally {

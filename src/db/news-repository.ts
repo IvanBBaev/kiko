@@ -53,9 +53,4 @@ export class NewsRepository {
       .orderBy(desc(newsItems.publishedAt))
       .limit(limit);
   }
-
-  async markDigested(ids: number[]): Promise<void> {
-    if (ids.length === 0) return;
-    await this.database.update(newsItems).set({ status: 'digested' }).where(inArray(newsItems.id, ids));
-  }
 }
