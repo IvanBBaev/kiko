@@ -12,14 +12,19 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   // (silenced in tests). Cast: fastify's logger generic specializes the
   // instance type, but downstream code only needs the base FastifyInstance.
   const loggerInstance = log.child({ module: 'http' }, options.logger === false ? { level: 'silent' } : {});
-  const app = Fastify({ loggerInstance }) as unknown as FastifyInstance;
+  // trustProxy lets req.ip read X-Forwarded-For so the rate limiter keys on the
+  // real client behind a reverse proxy instead of collapsing everyone into the
+  // proxy's single IP. Off by default (spoofable when not actually proxied).
+  const app = Fastify({ loggerInstance, trustProxy: config.trustProxy }) as unknown as FastifyInstance;
 
-  // Unified error shape: { error, statusCode } for validation errors,
-  // uncaught handler errors, and 404s alike.
+  // Unified error shape: { error, statusCode }. 5xx messages are NOT echoed to
+  // the client — they can carry driver/internal detail; a generic message goes
+  // out while the real error is logged.
   app.setErrorHandler((err: FastifyError, req, reply) => {
     const statusCode = err.statusCode ?? 500;
     if (statusCode >= 500) req.log.error({ err }, 'request failed');
-    void reply.code(statusCode).send({ error: err.message || 'internal server error', statusCode });
+    const body = statusCode >= 500 ? 'internal server error' : err.message || 'error';
+    void reply.code(statusCode).send({ error: body, statusCode });
   });
   app.setNotFoundHandler((_req, reply) => {
     void reply.code(404).send({ error: 'not found', statusCode: 404 });

@@ -19,12 +19,18 @@ function serializePost(row: Post): Record<string, unknown> {
 }
 
 function xmlEscape(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;');
+  return (
+    value
+      // Strip control characters illegal in XML 1.0 (everything below 0x20
+      // except tab/LF/CR) — one stray char makes the whole feed not well-formed.
+      // eslint-disable-next-line no-control-regex -- intentionally stripping XML-1.0-illegal control chars
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&apos;')
+  );
 }
 
 function tokensEqual(a: string, b: string): boolean {
@@ -33,12 +39,18 @@ function tokensEqual(a: string, b: string): boolean {
   return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
 }
 
+/** A valid Bearer token — only possible when API_TOKEN is configured. */
+function isTrusted(req: FastifyRequest): boolean {
+  if (!config.apiToken) return false;
+  const header = req.headers.authorization ?? '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  return token.length > 0 && tokensEqual(token, config.apiToken);
+}
+
 /** No-op unless API_TOKEN is configured — then mutating endpoints require it. */
 async function requireAuth(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   if (!config.apiToken) return;
-  const header = req.headers.authorization ?? '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (!token || !tokensEqual(token, config.apiToken)) {
+  if (!isTrusted(req)) {
     return reply.code(401).send({ error: 'unauthorized' });
   }
 }
@@ -81,7 +93,9 @@ const newsQuerySchema = {
 const regenerateQuerySchema = {
   type: 'object',
   properties: {
-    kind: { type: 'string', default: 'linkedin' },
+    // Only secondary channels can be regenerated — never 'site', which would
+    // duplicate the canonical digest (and race the unique slug index).
+    kind: { type: 'string', enum: ['linkedin'], default: 'linkedin' },
   },
 } as const;
 
@@ -93,7 +107,10 @@ interface ListPostsQuery {
 }
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/health', async (_req, reply) => {
+  // Liveness must answer even under a traffic spike, so it is exempt from the
+  // rate limiter — otherwise the Docker HEALTHCHECK can 429 and the container
+  // is marked unhealthy.
+  app.get('/health', { config: { rateLimit: false } }, async (_req, reply) => {
     try {
       const lastRun = await runsRepo.latest();
       return {
@@ -121,10 +138,14 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     { schema: { querystring: listPostsQuerySchema } },
     async (req, reply) => {
       const { kind, status, limit, offset } = req.query;
+      const trusted = isTrusted(req);
 
       const filters = [];
       if (kind) filters.push(eq(posts.kind, kind));
-      if (status) filters.push(eq(posts.status, status));
+      // Untrusted callers only ever see published posts; drafts are unreviewed
+      // LLM output. A trusted (Bearer) caller may filter by status for review.
+      if (!trusted) filters.push(eq(posts.status, 'published'));
+      else if (status) filters.push(eq(posts.status, status));
       const where = filters.length > 0 ? and(...filters) : undefined;
 
       const [rows, [counted]] = await Promise.all([
@@ -135,8 +156,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
           .where(where),
       ]);
 
-      // Posts change twice a day — let the site and CDNs cache reads briefly.
-      void reply.header('Cache-Control', 'public, max-age=300');
+      // Cache only public (published) responses, and briefly — a CDN keeps a
+      // post for up to max-age after it's unpublished, so keep the window small.
+      if (!trusted) void reply.header('Cache-Control', 'public, max-age=60');
       const total = counted?.total ?? 0;
       return { posts: rows.map(serializePost), total, limit, offset, hasMore: offset + rows.length < total };
     },
@@ -154,14 +176,14 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
         .map((term) => `"${term.replaceAll('"', '""')}"*`)
         .join(' ');
 
-      const rows = await db
-        .select()
-        .from(posts)
-        .where(sql`${posts.id} IN (SELECT rowid FROM posts_fts WHERE posts_fts MATCH ${match})`)
-        .orderBy(desc(posts.createdAt))
-        .limit(req.query.limit);
+      const trusted = isTrusted(req);
+      const ftsMatch = sql`${posts.id} IN (SELECT rowid FROM posts_fts WHERE posts_fts MATCH ${match})`;
+      // Untrusted search must not leak draft bodies through the index.
+      const where = trusted ? ftsMatch : and(ftsMatch, eq(posts.status, 'published'));
 
-      void reply.header('Cache-Control', 'public, max-age=300');
+      const rows = await db.select().from(posts).where(where).orderBy(desc(posts.createdAt)).limit(req.query.limit);
+
+      if (!trusted) void reply.header('Cache-Control', 'public, max-age=60');
       return { posts: rows.map(serializePost), q: req.query.q };
     },
   );
@@ -169,7 +191,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { id: number } }>('/api/posts/:id', { schema: { params: idParamsSchema } }, async (req, reply) => {
     const [row] = await db.select().from(posts).where(eq(posts.id, req.params.id));
     if (!row) return reply.code(404).send({ error: 'post not found' });
-    void reply.header('Cache-Control', 'public, max-age=300');
+    const trusted = isTrusted(req);
+    // A draft is visible only to a trusted caller; to everyone else it doesn't exist.
+    if (!trusted && row.status !== 'published') return reply.code(404).send({ error: 'post not found' });
+    if (!trusted) void reply.header('Cache-Control', 'public, max-age=60');
     return serializePost(row);
   });
 
@@ -220,7 +245,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // --- Own RSS feed (published site posts) ---
-  app.get('/feed.xml', async (_req, reply) => {
+  app.get('/feed.xml', async (req, reply) => {
     const rows = await db
       .select()
       .from(posts)
@@ -228,10 +253,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       .orderBy(desc(posts.createdAt))
       .limit(20);
 
-    const base = config.publicSiteUrl;
+    // RSS links must be absolute. Use the configured public site URL, else
+    // derive an absolute base from the request (honours trustProxy headers).
+    const base = config.publicSiteUrl ?? `${req.protocol}://${req.hostname}`;
     const items = rows
       .map((p) => {
-        const link = base && p.slug ? `${base}/posts/${p.slug}` : `${base ?? ''}/api/posts/${p.id}`;
+        const link = p.slug ? `${base}/posts/${p.slug}` : `${base}/api/posts/${p.id}`;
         return [
           '    <item>',
           `      <title>${xmlEscape(p.title ?? 'Untitled')}</title>`,
@@ -248,7 +275,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
 <rss version="2.0">
   <channel>
     <title>kiko — AI news digest</title>
-    <link>${xmlEscape(base ?? 'http://localhost')}</link>
+    <link>${xmlEscape(base)}</link>
     <description>Synthesized AI news digests</description>
     <language>${xmlEscape(config.languages.site)}</language>
 ${items}
@@ -257,7 +284,7 @@ ${items}
 
     return reply
       .header('Content-Type', 'application/rss+xml; charset=utf-8')
-      .header('Cache-Control', 'public, max-age=300')
+      .header('Cache-Control', 'public, max-age=60')
       .send(xml);
   });
 

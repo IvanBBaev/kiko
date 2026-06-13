@@ -62,6 +62,9 @@ export const config = {
   /** Max requests per minute per client IP. */
   rateLimitMax: int('RATE_LIMIT_MAX', process.env.RATE_LIMIT_MAX, 120),
 
+  /** Trust X-Forwarded-* — enable only when actually behind a reverse proxy. */
+  trustProxy: bool('TRUST_PROXY', process.env.TRUST_PROXY, false),
+
   /** When set, run failures and published posts are POSTed here as JSON events. */
   webhookUrl: process.env.WEBHOOK_URL || null,
 

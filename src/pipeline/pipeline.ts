@@ -210,6 +210,12 @@ export class Pipeline {
   async regenerate(sitePostId: number, kind = 'linkedin'): Promise<number | null> {
     const { postsRepo, generators, options } = this.deps;
 
+    // Regeneration derives a secondary channel FROM the digest; regenerating the
+    // 'site' digest itself would just duplicate it (and race the unique slug).
+    if (kind === 'site') {
+      throw new Error('Cannot regenerate kind "site" — it is the canonical digest, not a derived channel');
+    }
+
     const source = await postsRepo.findById(sitePostId);
     if (!source || source.kind !== 'site') return null;
 
