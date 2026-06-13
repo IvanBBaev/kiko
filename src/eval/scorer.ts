@@ -8,7 +8,10 @@ export interface EvalThresholds {
   maxWords: number;
 }
 
-export const DEFAULT_THRESHOLDS: EvalThresholds = { minSourceCoverage: 0.6, minWords: 500, maxWords: 1100 };
+// Coverage is intentionally lenient: the synthesizer is told to DROP marketing /
+// non-newsworthy items, so a good digest legitimately cites a majority — not all —
+// of its inputs. The gate catches "dropped half the stories", not editorial trims.
+export const DEFAULT_THRESHOLDS: EvalThresholds = { minSourceCoverage: 0.5, minWords: 500, maxWords: 1100 };
 
 export interface EvalScore {
   citationCount: number;
@@ -47,16 +50,22 @@ function detectTldr(body: string): boolean {
     .map((l) => l.trim())
     .filter(Boolean)
     .slice(0, 12);
-  return lines.some((l) => /^[-*•]\s+/.test(l));
+  // Bullet (-, *, •) or numbered (1.) list item near the top.
+  return lines.some((l) => /^([-*•]|\d+\.)\s+/.test(l));
 }
 
 /**
  * Deterministic, LLM-free quality scoring of a synthesized digest against its
- * input stories — the falsifiable half of the golden-set eval. Checks grounding
- * (citations resolve), source coverage (no dropped stories), citation density,
- * length, TL;DR presence, and topic tagging. Hard gates: valid citations,
- * coverage, length, at least one topic. TL;DR and canonical-topic adherence are
- * reported as signals but don't fail the post.
+ * input stories. Checks citation VALIDITY (every [n] resolves to a real source —
+ * NOT whether that source actually supports the claim), source coverage,
+ * citation density, length, TL;DR presence and topic tagging. Hard gates: valid
+ * citations, coverage, length, at least one topic. TL;DR and canonical-topic
+ * adherence are reported signals, not gates.
+ *
+ * It does NOT verify semantic grounding — a fabricated fact next to a valid [n]
+ * still passes. Claim-to-source support needs an LLM judge (the backlogged
+ * verification pass); a green eval here means "well-formed and well-cited", not
+ * "every fact is true".
  */
 export function scorePost(
   post: SitePost,

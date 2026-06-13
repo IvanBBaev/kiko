@@ -2,6 +2,38 @@
 
 Completed work, newest first. Active items live in [TODO.md](TODO.md).
 
+## 2026-06-14 — NOW-tier product epic (from the BA feature-gap analysis)
+
+Implemented the unblocked, highest-leverage gaps a business-analyst pass surfaced,
+in five gated batches (each `npm run check` green); 117 → 135 tests.
+
+- [x] **Topic taxonomy** (`bfaf689`): synthesizer tags each digest with 2–5
+      canonical topics; `posts.topics` column; `?topic` filter on `/api/posts`
+      and `/feed.xml` (+ `<category>` tags). The shared primitive under per-topic
+      feeds, topic analytics, related posts and SEO.
+- [x] **AI-content disclosure** (`be912b7`, adjusted): `aiGenerated` +
+      configurable `aiDisclosure` on the API and the RSS channel — machine-
+      readable metadata the site can label content with. (Per feedback, the
+      visible "AI-generated" marker was removed from the OG card — the header
+      already brands it; the disclosure is metadata, not stamped on the image.)
+- [x] **Draft editing** (`7569a4a`): auth-gated `PATCH /api/posts/:id` edits the
+      safe fields (title/summary/body/firstComment/hashtags/topics); FTS re-indexes
+      on update. "Review" can finally mean "edit", not just accept/reject.
+- [x] **Engagement rates** (`3a8633f`): `/api/analytics` gains an impression→click
+      funnel + CTR, and `topPosts` ranks by engagement (clicks+shares), not raw
+      volume. Deterministic ties; CTR guards divide-by-zero.
+- [x] **Golden-set eval** (`d4a1a86`): deterministic scorer (citation validity,
+      source coverage, length, topics) over a version-controlled golden set;
+      `npm run eval` runs it. Makes prompt changes falsifiable without the live
+      API; the scorer is fully unit-tested.
+- [x] **Adversarial self-review** (workflow, 5 angles — partly rate-limited):
+      clarified the eval scores citation _validity_, not semantic grounding;
+      lowered the coverage gate to 0.5 (the synthesizer legitimately drops
+      marketing); `detectTldr` now matches numbered lists; `aiDisclosure` uses
+      `||` so an empty env doesn't blank it; `eval` uses `exitCode` not
+      `process.exit`; **boot warning when `API_TOKEN` is unset** (mutating + PATCH
+      endpoints are then unauthenticated). Gate green: 135 tests, 93.0/84.7/92.6.
+
 ## 2026-06-13 — Analytics feedback loop (engagement events)
 
 - [x] **`post_events` table + `EventsRepository`** — per-post engagement events

@@ -1,7 +1,8 @@
 // Golden-set synthesis eval: runs the real synthesizer over a fixed input set
-// and scores grounding/coverage/length/topics so prompt changes become
-// falsifiable. Requires ANTHROPIC_API_KEY (it makes real LLM calls), like the
-// pipeline CLI. The scoring logic is unit-tested in src/eval/scorer.test.ts.
+// and scores citation validity / coverage / length / topics so prompt changes
+// become falsifiable. (It does not check semantic grounding — see scorer.ts.)
+// Requires ANTHROPIC_API_KEY (it makes real LLM calls), like the pipeline CLI.
+// The scoring logic is unit-tested in src/eval/scorer.test.ts.
 import { GOLDEN_SET } from '../eval/golden-set.js';
 import { DEFAULT_THRESHOLDS, scorePost } from '../eval/scorer.js';
 import { ClaudeSynthesizer } from '../llm/synthesizer.js';
@@ -33,4 +34,5 @@ for (const testCase of GOLDEN_SET) {
 }
 
 console.log(`\n${GOLDEN_SET.length - failed}/${GOLDEN_SET.length} cases passed`);
-process.exit(failed > 0 ? 1 : 0);
+// exitCode (not process.exit) so buffered stdout flushes before the process ends.
+process.exitCode = failed > 0 ? 1 : 0;

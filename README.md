@@ -69,20 +69,21 @@ call, no tokens.
 | Method | Path                        | Description                                                    |
 | ------ | --------------------------- | -------------------------------------------------------------- |
 | GET    | `/health`                   | Liveness + DB check + last run / next cron fire                |
-| GET    | `/api/posts`                | List posts (`?kind&status&limit&offset`), pagination metadata  |
+| GET    | `/api/posts`                | List posts (`?kind&status&topic&limit&offset`), pagination     |
 | GET    | `/api/posts/search`         | FTS5 full-text search (`?q=&limit=`)                           |
 | GET    | `/api/posts/:id`            | Single post (sources resolve `[n]` citations to URLs)          |
+| PATCH  | `/api/posts/:id`            | Edit a draft/post (title/summary/body/topics/hashtags) 🔒      |
 | GET    | `/og/posts/:id.png`         | Open Graph card image (1200×630 PNG) for link previews         |
 | POST   | `/api/posts/:id/publish`    | Mark a post as published 🔒 (fires `post.published` webhook)   |
 | POST   | `/api/posts/:id/unpublish`  | Back to draft 🔒                                               |
 | POST   | `/api/posts/:id/regenerate` | New channel post from an existing digest (`?kind=linkedin`) 🔒 |
 | POST   | `/api/posts/:id/events`     | Record an engagement event (`{type, source?}`) from the site   |
-| GET    | `/feed.xml`                 | RSS feed of published site posts                               |
+| GET    | `/feed.xml`                 | RSS feed of published site posts (`?topic=` filter)            |
 | GET    | `/api/news`                 | Raw news items (`?status=new\|digested`)                       |
 | POST   | `/api/pipeline/run`         | Trigger a pipeline run (202, background) 🔒                    |
 | GET    | `/api/runs`                 | Last 20 pipeline runs (incl. token spend per run)              |
 | GET    | `/api/usage`                | Aggregate token spend across all posts                         |
-| GET    | `/api/analytics`            | Engagement aggregates (by type, by source, top posts)          |
+| GET    | `/api/analytics`            | Engagement funnel + CTR, top posts ranked by engagement        |
 
 🔒 — when `API_TOKEN` is set, these require `Authorization: Bearer <token>`.
 Posts are created as `draft`; the site should query `?status=published`.
@@ -101,6 +102,22 @@ never leaks through it. Writes are throttled only by the global rate limiter, so
 job (tracked in [TODO.md](TODO.md)) and consider an `ANALYTICS_TOKEN` gate or
 event batching.
 
+**Topics.** The synthesizer tags each digest with 2–5 `topics` (steered toward a
+canonical set: models, research, funding, policy, safety, tooling, open-source,
+hardware, product, agents). Posts expose `topics`; filter the list and the RSS
+feed with `?topic=`, and `/feed.xml` emits `<category>` tags.
+
+**AI-content disclosure.** Posts carry machine-readable `aiGenerated: true` and a
+configurable `aiDisclosure` string (`AI_DISCLOSURE`), and the RSS channel notes
+it — so the consuming site can label AI content (EU AI Act / platform rules) as
+it sees fit. It is metadata for the frontend, not stamped onto the OG image.
+
+**Synthesis eval.** `npm run eval` runs the synthesizer over a fixed golden set
+([src/eval/golden-set.ts](src/eval/golden-set.ts)) and scores citation validity,
+source coverage, length and topics so prompt changes are falsifiable. It checks
+that citations are well-formed and that stories aren't dropped — not that each
+claim is semantically supported by its source (that needs an LLM judge).
+
 ## Running
 
 ```bash
@@ -110,6 +127,7 @@ npm install
 npm run dev            # server + scheduler
 npm run ingest         # feeds → DB only, no LLM calls (zero tokens)
 npm run pipeline       # full one-off pipeline run from the CLI
+npm run eval           # golden-set synthesis eval (needs ANTHROPIC_API_KEY)
 npm run test           # unit + integration tests (node:test, in-memory SQLite)
 npm run test:coverage  # c8 coverage report with ratchet thresholds
 npm run typecheck

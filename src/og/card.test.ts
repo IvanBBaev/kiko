@@ -112,10 +112,4 @@ describe('buildCardElement', () => {
     assert.equal(middleWith.props.children.length, 2);
     assert.equal(middleWithout.props.children.length, 1);
   });
-
-  it('always renders the AI-generated disclosure in the footer', () => {
-    const el = buildCardElement(buildCardModel(base, 'en'));
-    const footer = (el.props.children as { props: { children: unknown } }[])[2]!;
-    assert.match(String(footer.props.children), /AI-generated$/);
-  });
 });

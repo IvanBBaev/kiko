@@ -92,7 +92,8 @@ export const config = {
    * synthetic-media rules of platforms like LinkedIn. Operator-overridable for
    * wording/localization, but always present.
    */
-  aiDisclosure: process.env.AI_DISCLOSURE ?? 'AI-generated from cited sources and reviewed before publishing.',
+  // `||` (not `??`) so AI_DISCLOSURE="" also falls back — the label is never empty.
+  aiDisclosure: process.env.AI_DISCLOSURE || 'AI-generated from cited sources and reviewed before publishing.',
 
   pipeline: {
     cron: process.env.PIPELINE_CRON ?? '0 7 * * *',

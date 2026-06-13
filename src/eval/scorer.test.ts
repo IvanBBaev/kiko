@@ -74,6 +74,8 @@ describe('scorePost', () => {
   it('detects a TL;DR bullet list and flags non-canonical topics', () => {
     const bullets = scorePost(post('- bullet one [1]\n- bullet two [2]\n- bullet three [3]'), clusters, TH);
     assert.equal(bullets.hasTldr, true);
+    const numbered = scorePost(post('1. first [1]\n2. second [2]\n3. third [3]'), clusters, TH);
+    assert.equal(numbered.hasTldr, true, 'numbered TL;DR lists are detected too');
     const nonCanonical = scorePost(post('all cited [1] [2] [3] here', ['made-up-topic']), clusters, TH);
     assert.equal(nonCanonical.topicsCanonical, false);
     assert.equal(nonCanonical.pass, true, 'a non-canonical topic is a signal, not a hard failure');

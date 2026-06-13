@@ -10,7 +10,8 @@
 - [ ] First real pipeline run against the Anthropic API — requires
       `ANTHROPIC_API_KEY` in `.env`, then `npm run pipeline`. The non-LLM half
       is verified against live feeds; the synthesis path is unit-tested with a
-      mocked client only.
+      mocked client only. Run `npm run eval` alongside it: the golden-set harness
+      and scorer are shipped (DONE), only the live LLM call needs the key.
 - [ ] `docker compose up --build` runtime smoke — CI now builds the image on
       every push (the `docker` job), so the build itself is covered; this item
       is only the local end-to-end run, which needs a running Docker daemon.
@@ -31,9 +32,6 @@ need a deeper change or external infra:
 
 ## Next
 
-- [ ] Golden-set eval: fixed item set → synthesis → automatic scoring (every
-      claim cited? no dropped sources?) — prompt changes are unfalsifiable
-      without it. Requires an API key.
 - [ ] Litestream continuous replication (`db:backup` covers the basic case).
 
 ## Backlog (when needed)

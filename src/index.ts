@@ -20,6 +20,15 @@ if (config.pipeline.scheduleEnabled && !hasAnthropicCredentials()) {
   );
 }
 
+// Mutating endpoints (publish/unpublish, draft edit, regenerate, pipeline run)
+// are unauthenticated unless API_TOKEN is set. Fine for local/trusted use, but a
+// public deploy without it lets anyone rewrite or publish content.
+if (!config.apiToken) {
+  app.log.warn(
+    'API_TOKEN is not set — publish/unpublish/edit/regenerate/pipeline endpoints are UNAUTHENTICATED. Set API_TOKEN before exposing kiko publicly.',
+  );
+}
+
 // Catch-up: if the server was down (or crashed) when cron should have fired, run
 // now instead of waiting up to a full day. Fire when the latest run is overdue
 // OR errored — a recent crashed run (just swept above) still owes us a digest.
