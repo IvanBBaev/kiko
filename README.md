@@ -76,17 +76,30 @@ call, no tokens.
 | POST   | `/api/posts/:id/publish`    | Mark a post as published 🔒 (fires `post.published` webhook)   |
 | POST   | `/api/posts/:id/unpublish`  | Back to draft 🔒                                               |
 | POST   | `/api/posts/:id/regenerate` | New channel post from an existing digest (`?kind=linkedin`) 🔒 |
+| POST   | `/api/posts/:id/events`     | Record an engagement event (`{type, source?}`) from the site   |
 | GET    | `/feed.xml`                 | RSS feed of published site posts                               |
 | GET    | `/api/news`                 | Raw news items (`?status=new\|digested`)                       |
 | POST   | `/api/pipeline/run`         | Trigger a pipeline run (202, background) 🔒                    |
 | GET    | `/api/runs`                 | Last 20 pipeline runs (incl. token spend per run)              |
 | GET    | `/api/usage`                | Aggregate token spend across all posts                         |
+| GET    | `/api/analytics`            | Engagement aggregates (by type, by source, top posts)          |
 
 🔒 — when `API_TOKEN` is set, these require `Authorization: Bearer <token>`.
 Posts are created as `draft`; the site should query `?status=published`.
 Errors are uniformly `{ "error": string, "statusCode": number }`.
 When `WEBHOOK_URL` is set, `run.error` / `run.partial` / `post.published`
 events are POSTed there as JSON.
+
+**Analytics feedback loop.** The consuming site reports engagement by POSTing
+`{ type, source? }` (`type` ∈ `view`/`click`/`impression`/`share`) to
+`/api/posts/:id/events` — public and unauthenticated (the frontend has no
+token), accepted only for posts the caller can see, and storing **no PII** (just
+type + optional channel + timestamp). `/api/analytics` aggregates them (totals,
+by type, by source, top posts) **for published posts only** — a draft's title
+never leaks through it. Writes are throttled only by the global rate limiter, so
+`post_events` grows with traffic: before high-volume production, add a retention
+job (tracked in [TODO.md](TODO.md)) and consider an `ANALYTICS_TOKEN` gate or
+event batching.
 
 ## Running
 

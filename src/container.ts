@@ -1,6 +1,7 @@
 // Composition root — the only place where concrete implementations are wired
 // together. Everything else depends on the ports in src/core/ports.ts.
 import { config } from './config.js';
+import { EventsRepository } from './db/events-repository.js';
 import { FeedValidatorsRepository } from './db/feed-validators-repository.js';
 import { NewsRepository } from './db/news-repository.js';
 import { PostsRepository } from './db/posts-repository.js';
@@ -15,6 +16,7 @@ export const newsRepo = new NewsRepository();
 export const postsRepo = new PostsRepository();
 export const runsRepo = new RunsRepository();
 export const feedValidatorsRepo = new FeedValidatorsRepository();
+export const eventsRepo = new EventsRepository();
 export const ogRenderer = new SatoriOgRenderer();
 
 export const pipeline = new Pipeline({

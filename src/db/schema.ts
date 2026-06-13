@@ -81,6 +81,28 @@ export const feedValidators = sqliteTable('feed_validators', {
   updatedAt: text('updated_at').notNull(),
 });
 
+/**
+ * Per-post engagement events reported by the consuming site — the raw data
+ * behind the analytics feedback loop. No PII is stored: only the event type, an
+ * optional channel/referrer, and a timestamp. Cascade-deletes with its post.
+ */
+export const postEvents = sqliteTable(
+  'post_events',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    postId: integer('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    /** view | click | impression | share */
+    type: text('type').notNull(),
+    /** Optional channel/referrer the event came from (e.g. 'linkedin', 'rss'). */
+    source: text('source'),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [index('idx_post_events_post').on(t.postId), index('idx_post_events_type').on(t.type)],
+);
+
 export type NewsItem = typeof newsItems.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Run = typeof runs.$inferSelect;
+export type PostEvent = typeof postEvents.$inferSelect;

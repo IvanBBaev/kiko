@@ -82,6 +82,16 @@ CREATE TABLE IF NOT EXISTS feed_validators (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS post_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  source TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_post_events_post ON post_events(post_id);
+CREATE INDEX IF NOT EXISTS idx_post_events_type ON post_events(type);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(title, summary, body, content='posts', content_rowid='id');
 CREATE TRIGGER IF NOT EXISTS posts_fts_ai AFTER INSERT ON posts BEGIN
   INSERT INTO posts_fts(rowid, title, summary, body) VALUES (new.id, new.title, new.summary, new.body);

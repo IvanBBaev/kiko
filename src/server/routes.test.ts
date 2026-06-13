@@ -202,3 +202,51 @@ describe('GET /og/posts/:id.png', () => {
     assert.equal(res.json().ogImageUrl, '/og/posts/2.png');
   });
 });
+
+describe('engagement events + analytics', () => {
+  it('records an event for a published post', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/posts/2/events', payload: { type: 'view' } });
+    assert.equal(res.statusCode, 202);
+    assert.equal(res.json().status, 'recorded');
+  });
+
+  it('rejects an unknown event type at schema validation', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/posts/2/events', payload: { type: 'bogus' } });
+    assert.equal(res.statusCode, 400);
+  });
+
+  it('404s an event for a missing post', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/posts/9999/events', payload: { type: 'view' } });
+    assert.equal(res.statusCode, 404);
+  });
+
+  it('hides a draft from public events but accepts them from a trusted caller', async () => {
+    const anon = await app.inject({ method: 'POST', url: '/api/posts/1/events', payload: { type: 'click' } });
+    assert.equal(anon.statusCode, 404, 'a draft must not accept (or reveal) public events');
+    const trusted = await app.inject({
+      method: 'POST',
+      url: '/api/posts/1/events',
+      payload: { type: 'click' },
+      headers: AUTH,
+    });
+    assert.equal(trusted.statusCode, 202);
+  });
+
+  it('aggregates only published-post events at /api/analytics (no draft leak)', async () => {
+    // Recorded above: post 2 'view' (published) counts; post 1 'click' was on a
+    // DRAFT, so it is excluded from the public analytics entirely.
+    const res = await app.inject({ method: 'GET', url: '/api/analytics' });
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.equal(body.totalEvents, 1);
+    const types = new Map(body.byType.map((r: { type: string; count: number }) => [r.type, r.count]));
+    assert.equal(types.get('view'), 1);
+    assert.equal(types.get('click'), undefined, 'the draft-only click is not surfaced');
+    assert.equal(body.topPosts.length, 1);
+    assert.equal(body.topPosts[0].id, 2);
+    assert.ok(
+      !body.topPosts.some((p: { id: number }) => p.id === 1),
+      "the draft post's title must never leak via public analytics",
+    );
+  });
+});

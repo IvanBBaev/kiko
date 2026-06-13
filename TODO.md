@@ -35,7 +35,6 @@ need a deeper change or external infra:
       claim cited? no dropped sources?) — prompt changes are unfalsifiable
       without it. Requires an API key.
 - [ ] Litestream continuous replication (`db:backup` covers the basic case).
-- [ ] Analytics feedback loop — which posts/topics perform, to tune the prompt.
 
 ## Backlog (when needed)
 
@@ -44,7 +43,11 @@ need a deeper change or external infra:
       claim have a covering source?").
 - [ ] Semantic clustering with embeddings — if sources grow past ~30 feeds.
 - [ ] drizzle-kit migrations instead of bootstrap DDL — once the schema stabilizes.
-- [ ] Pruning of old news_items (cron) — data grows slowly, not urgent.
+- [ ] Retention cron for old `news_items` and `post_events` (+ periodic VACUUM).
+      `news_items` grows slowly, but `post_events` is fed by a public unauthenticated
+      write (`POST /api/posts/:id/events`), bounded today only by the global rate
+      limiter — add retention before high-volume production. Optionally gate that
+      endpoint behind an `ANALYTICS_TOKEN` and/or batch events if abuse appears.
 - [ ] LinkedIn API integration for direct publishing (now: copy-paste from
       `/api/posts?kind=linkedin`).
 - [ ] Review/approval workflow UI (now: publish/unpublish via API).

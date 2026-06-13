@@ -2,6 +2,25 @@
 
 Completed work, newest first. Active items live in [TODO.md](TODO.md).
 
+## 2026-06-13 — Analytics feedback loop (engagement events)
+
+- [x] **`post_events` table + `EventsRepository`** — per-post engagement events
+      (view/click/impression/share + optional channel), FK to `posts` with
+      `ON DELETE CASCADE`, drizzle schema + bootstrap DDL, covered by the schema
+      drift test. No PII (type + source + timestamp only).
+- [x] **`POST /api/posts/:id/events`** — public, unauthenticated ingestion (the
+      consuming site has no token), accepted only for posts the caller can see
+      (mirrors `/api/posts/:id` draft gating), throttled by the global rate limiter.
+- [x] **`GET /api/analytics`** — totals, by type, by source, top posts, to inform
+      prompt/topic tuning.
+- [x] **Adversarial self-review** (workflow, 4 angles → verify, 19 findings): fixed
+      a **draft-title leak** — analytics now aggregate published-post events only,
+      so an unpublished post never surfaces via the public endpoint; bounded the
+      `bySource` payload (`LIMIT`, since `source` is attacker-controlled); added a
+      stable secondary sort so ranked output is deterministic. Documented the
+      unbounded-growth ceiling of the public write path and backlogged a retention
+      cron + optional `ANALYTICS_TOKEN`. Gate green: 117 tests, 92.2 / 84.7 / 92.2.
+
 ## 2026-06-13 — Open Graph card images
 
 - [x] **`GET /og/posts/:id.png`** — on-the-fly 1200×630 PNG link-preview card per

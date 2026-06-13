@@ -2,7 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { config } from '../config.js';
-import { ogRenderer, pipeline, runsRepo } from '../container.js';
+import { eventsRepo, ogRenderer, pipeline, runsRepo } from '../container.js';
 import { db } from '../db/client.js';
 import { newsItems, posts, runs, type Post } from '../db/schema.js';
 import { postToCardData } from '../og/card.js';
@@ -105,6 +105,16 @@ const regenerateQuerySchema = {
     // Only secondary channels can be regenerated — never 'site', which would
     // duplicate the canonical digest (and race the unique slug index).
     kind: { type: 'string', enum: ['linkedin'], default: 'linkedin' },
+  },
+} as const;
+
+const postEventBodySchema = {
+  type: 'object',
+  required: ['type'],
+  properties: {
+    type: { type: 'string', enum: ['view', 'click', 'impression', 'share'] },
+    // Optional free-form channel/referrer; bounded so an event row can't bloat.
+    source: { type: 'string', maxLength: 80 },
   },
 } as const;
 
@@ -278,6 +288,23 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Engagement telemetry from the consuming site. Public and unauthenticated by
+  // design — the frontend has no token — and only bounded telemetry rows are
+  // written, throttled by the global rate limiter. Events are accepted only for
+  // posts the caller can see (published, or any for a trusted caller), mirroring
+  // GET /api/posts/:id so a draft's existence never leaks. No PII is stored.
+  app.post<{ Params: { id: number }; Body: { type: string; source?: string } }>(
+    '/api/posts/:id/events',
+    { schema: { params: idParamsSchema, body: postEventBodySchema } },
+    async (req, reply) => {
+      const [row] = await db.select({ status: posts.status }).from(posts).where(eq(posts.id, req.params.id));
+      if (!row) return reply.code(404).send({ error: 'post not found' });
+      if (!isTrusted(req) && row.status !== 'published') return reply.code(404).send({ error: 'post not found' });
+      await eventsRepo.record(req.params.id, req.body.type, req.body.source ?? null);
+      return reply.code(202).send({ status: 'recorded' });
+    },
+  );
+
   // --- Own RSS feed (published site posts) ---
   app.get('/feed.xml', async (req, reply) => {
     const rows = await db
@@ -365,5 +392,16 @@ ${items}
       })
       .from(posts);
     return totals;
+  });
+
+  // --- Engagement analytics (feedback loop for tuning content) ---
+  app.get('/api/analytics', async () => {
+    const [totalEvents, byType, bySource, topPosts] = await Promise.all([
+      eventsRepo.total(),
+      eventsRepo.byType(),
+      eventsRepo.bySource(),
+      eventsRepo.topPosts(20),
+    ]);
+    return { totalEvents, byType, bySource, topPosts };
   });
 }
