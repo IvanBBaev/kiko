@@ -2,6 +2,22 @@
 
 Completed work, newest first. Active items live in [TODO.md](TODO.md).
 
+## 2026-06-13 — Config enum validation + image supply chain
+
+- [x] **Config enums validated at boot** (`eea006d`): a strict `oneOf()` helper
+      joins `int()`/`bool()`; `LLM_EFFORT` and the previously-unvalidated
+      `LOG_LEVEL` now fail fast on a bad value instead of reaching pino / the
+      model API mid-run. Chose targeted enum hardening over a full zod rewrite —
+      the helpers already reject every value that can be wrong; full zod moved to
+      the backlog as ergonomics, not coverage.
+- [x] **Base image pinned + scanned** (`2a00015`): `node:22-slim` pinned to its
+      multi-arch manifest-list digest in both Dockerfile stages (still resolves
+      per-arch); Dependabot `docker` ecosystem added to bump it monthly. New CI
+      `docker` job builds the image (the build smoke that can't run locally) and
+      Trivy-scans it for HIGH/CRITICAL OS/base CVEs (`ignore-unfixed` keeps the
+      gate actionable) — coverage `npm audit` can't give. Publishing kiko's own
+      multi-arch image via buildx deferred until there is a registry to push to.
+
 ## 2026-06-13 — Code review fixes (28 of 30 findings, two recall passes)
 
 Worked in five gated batches; each ran `npm run check` green before committing.

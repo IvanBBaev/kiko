@@ -113,6 +113,10 @@ docker build -t kiko .
 docker run -d -p 3000:3000 -v kiko-data:/app/data -e ANTHROPIC_API_KEY=sk-ant-... kiko
 ```
 
+The base image is pinned by its multi-arch manifest-list digest (reproducible
+builds, bumped by Dependabot); CI builds the image on every push and Trivy-scans
+it for HIGH/CRITICAL OS CVEs.
+
 Configuration is environment-only — see [.env.example](.env.example) for every knob
 (model, effort, cron, item limits, output language).
 

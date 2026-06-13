@@ -11,8 +11,9 @@
       `ANTHROPIC_API_KEY` in `.env`, then `npm run pipeline`. The non-LLM half
       is verified against live feeds; the synthesis path is unit-tested with a
       mocked client only.
-- [ ] `docker build` smoke — the Docker daemon was not running. Start Docker
-      Desktop and run `docker compose up --build`.
+- [ ] `docker compose up --build` runtime smoke — CI now builds the image on
+      every push (the `docker` job), so the build itself is covered; this item
+      is only the local end-to-end run, which needs a running Docker daemon.
 - [ ] External uptime monitoring on `/health` (UptimeRobot / healthchecks.io) —
       needs an account.
 
@@ -33,10 +34,7 @@ need a deeper change or external infra:
 - [ ] Golden-set eval: fixed item set → synthesis → automatic scoring (every
       claim cited? no dropped sources?) — prompt changes are unfalsifiable
       without it. Requires an API key.
-- [ ] Full zod validation of config (the strict `int()` already covers the
-      typo case).
 - [ ] Litestream continuous replication (`db:backup` covers the basic case).
-- [ ] Pinned base image digest + trivy scan in CI; multi-arch (amd64 + arm64).
 - [ ] OG image generation for posts (shareability).
 - [ ] Analytics feedback loop — which posts/topics perform, to tune the prompt.
 
@@ -51,3 +49,7 @@ need a deeper change or external infra:
 - [ ] LinkedIn API integration for direct publishing (now: copy-paste from
       `/api/posts?kind=linkedin`).
 - [ ] Review/approval workflow UI (now: publish/unpublish via API).
+- [ ] Full zod rewrite of config — optional; `int()`/`bool()`/`oneOf()` already
+      reject every value that can be wrong, so this is ergonomics, not coverage.
+- [ ] Publish kiko's own multi-arch image (buildx amd64+arm64) — only once there
+      is a registry to push to; today the service is built from source via compose.
