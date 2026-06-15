@@ -14,7 +14,10 @@ sweepInterruptedRuns();
 
 const job = startScheduler(app.log);
 
-if (config.pipeline.scheduleEnabled && !hasAnthropicCredentials()) {
+// Only the anthropic synthesis mode needs API credentials; `none` (ingest only)
+// and the not-yet-built `local` do not.
+const synthesisNeedsCreds = config.pipeline.synthesisMode === 'anthropic';
+if (config.pipeline.scheduleEnabled && synthesisNeedsCreds && !hasAnthropicCredentials()) {
   app.log.warn(
     'Scheduler is enabled but no ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN is set — scheduled runs will fail at synthesis',
   );
@@ -33,7 +36,12 @@ if (!config.apiToken) {
 // now instead of waiting up to a full day. Fire when the latest run is overdue
 // OR errored — a recent crashed run (just swept above) still owes us a digest.
 // Dedupe + the min-stories guard make a redundant catch-up cost zero tokens.
-if (config.pipeline.scheduleEnabled && hasAnthropicCredentials()) {
+// `none` mode catches up without credentials (it only ingests); `anthropic`
+// needs a key; `local` is skipped until implemented.
+const canRunCatchUp =
+  config.pipeline.synthesisMode === 'none' ||
+  (config.pipeline.synthesisMode === 'anthropic' && hasAnthropicCredentials());
+if (config.pipeline.scheduleEnabled && canRunCatchUp) {
   const latest = await runsRepo.latest();
   if (shouldCatchUp(latest, config.pipeline.catchUpHours, Date.now())) {
     app.log.info({ lastRunStatus: latest?.status ?? null }, 'starting catch-up pipeline run');

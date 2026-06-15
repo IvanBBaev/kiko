@@ -45,6 +45,7 @@ export const pipeline = new Pipeline({
     itemSummaryMaxChars: config.pipeline.itemSummaryMaxChars,
     fetchConcurrency: config.pipeline.fetchConcurrency,
     candidatePoolMultiplier: config.pipeline.candidatePoolMultiplier,
+    synthesisMode: config.pipeline.synthesisMode,
     model: config.llm.model,
   },
 });

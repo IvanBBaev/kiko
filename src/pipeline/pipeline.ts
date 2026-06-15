@@ -21,6 +21,8 @@ export interface PipelineOptions {
   /** Candidate pool = maxItemsPerDigest × this; a wider recency window so the
    *  cluster/LLM editorial pick sees more of the day across many sources. */
   candidatePoolMultiplier: number;
+  /** none = ingest only (no LLM) | local = Ollama (not yet) | anthropic = API. */
+  synthesisMode: 'none' | 'local' | 'anthropic';
   model: string;
 }
 
@@ -109,11 +111,17 @@ export class Pipeline {
     if (this.running) {
       throw new Error('Pipeline is already running');
     }
-    this.running = true;
 
     const { synthesizer, generators, newsRepo, postsRepo, runsRepo, options } = this.deps;
+    // Local synthesis isn't built yet — fail clearly rather than silently doing
+    // nothing or falling through to the Anthropic path.
+    if (options.synthesisMode === 'local') {
+      throw new Error('SYNTHESIS_MODE=local is not implemented yet — use "none" or "anthropic"');
+    }
+    this.running = true;
+
     const runId = await runsRepo.start();
-    log.info({ runId }, 'pipeline run started');
+    log.info({ runId, mode: options.synthesisMode }, 'pipeline run started');
 
     // Hoisted so the error path can record what the run already did/paid.
     let itemsFetched = 0;
@@ -123,6 +131,14 @@ export class Pipeline {
     try {
       // 1. Ingest
       ({ itemsFetched, itemsNew } = await this.ingest());
+
+      // SYNTHESIS_MODE=none: stop before any LLM call. Items stay 'new' and are
+      // served raw via /api/news; no digest is produced. Reuses ingest() above.
+      if (options.synthesisMode === 'none') {
+        await runsRepo.finish(runId, { status: 'skipped', itemsFetched, itemsNew });
+        log.info({ runId, itemsNew }, 'pipeline run: synthesis disabled (mode=none), ingest only');
+        return { runId, status: 'skipped', itemsFetched, itemsNew, postsCreated: 0 };
+      }
 
       // 2. Select 2x the digest cap — clustering compresses multi-source
       // coverage, so more stories fit the same budget. Stories cut by the cap

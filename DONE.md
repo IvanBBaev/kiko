@@ -2,6 +2,18 @@
 
 Completed work, newest first. Active items live in [TODO.md](TODO.md).
 
+## 2026-06-15 — SYNTHESIS_MODE skeleton (none implemented)
+
+From the handoff spec (Section 3.1): a three-state synthesis mode, but only the
+zero-risk piece now. `SYNTHESIS_MODE` (`none|local|anthropic`, validated by the
+strict `oneOf()`); `none` stops the pipeline after `ingest()` (reused, not
+duplicated) — raw items served via `/api/news`, zero LLM, run recorded `skipped`,
+items stay `new`. `anthropic` unchanged. `local` (Ollama) is reserved but fails
+fast as not-implemented — deliberately deferred so two unproven paths aren't built
+at once. Boot credential warning + catch-up are now mode-aware (`none` needs no
+key). Gate green: 150 tests. (The real blocker — first live `anthropic` run —
+still waits on the API key.)
+
 ## 2026-06-15 — Data-driven source registry (scale ingestion to many feeds)
 
 Re-architected ingestion from a hard-coded feed array to a data-driven registry,

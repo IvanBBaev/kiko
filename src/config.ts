@@ -59,6 +59,15 @@ export type Effort = 'low' | 'medium' | 'high' | 'max';
 const EFFORTS = ['low', 'medium', 'high', 'max'] as const;
 const effort = oneOf('LLM_EFFORT', process.env.LLM_EFFORT, EFFORTS, 'high');
 
+/**
+ * How the pipeline turns clustered stories into a digest:
+ * - `none`      — ingest only; serve raw items via /api/news. Zero LLM, zero cost.
+ * - `local`     — synthesize via a local model (Ollama). NOT IMPLEMENTED YET.
+ * - `anthropic` — synthesize via the Anthropic API (the current llm/ layer).
+ */
+export type SynthesisMode = 'none' | 'local' | 'anthropic';
+const SYNTHESIS_MODES = ['none', 'local', 'anthropic'] as const;
+
 const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'] as const;
 
 const baseLanguage = process.env.POSTS_LANGUAGE ?? 'en';
@@ -96,6 +105,8 @@ export const config = {
   aiDisclosure: process.env.AI_DISCLOSURE || 'AI-generated from cited sources and reviewed before publishing.',
 
   pipeline: {
+    /** none = ingest only (no LLM) | local = Ollama (not yet) | anthropic = API. */
+    synthesisMode: oneOf('SYNTHESIS_MODE', process.env.SYNTHESIS_MODE, SYNTHESIS_MODES, 'anthropic'),
     cron: process.env.PIPELINE_CRON ?? '0 7 * * *',
     /** IANA timezone for the cron schedule; defaults to server-local time. */
     timezone: process.env.PIPELINE_TZ || null,

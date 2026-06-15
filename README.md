@@ -116,6 +116,12 @@ own. The seed favors signal over count (research labs, reputable media,
 high-signal practitioners); arXiv/aggregator firehoses are left out until
 relevance ranking lands.
 
+**Synthesis mode** (`SYNTHESIS_MODE`, default `anthropic`). `none` runs ingest
+only — the site gets raw merged items via `/api/news`, zero LLM, zero cost (the
+run records as `skipped`, items stay `new`). `anthropic` synthesizes the digest
+via the API (needs `ANTHROPIC_API_KEY`). `local` (Ollama) is reserved but not yet
+implemented — selecting it fails fast.
+
 **Topics.** The synthesizer tags each digest with 2–5 `topics` (steered toward a
 canonical set: models, research, funding, policy, safety, tooling, open-source,
 hardware, product, agents). Posts expose `topics`; filter the list and the RSS

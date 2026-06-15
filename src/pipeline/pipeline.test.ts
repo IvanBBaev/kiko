@@ -78,7 +78,12 @@ const failingGenerator: PostGenerator = {
   },
 };
 
-function makePipeline(sources: NewsSource[], generators: PostGenerator[], minItems = 2) {
+function makePipeline(
+  sources: NewsSource[],
+  generators: PostGenerator[],
+  minItems = 2,
+  synthesisMode: 'none' | 'local' | 'anthropic' = 'anthropic',
+) {
   return new Pipeline({
     listSources: async () => sources.map((source, i) => ({ id: i + 1, source })),
     onSourceResult: async () => {},
@@ -94,6 +99,7 @@ function makePipeline(sources: NewsSource[], generators: PostGenerator[], minIte
       itemSummaryMaxChars: 400,
       fetchConcurrency: 8,
       candidatePoolMultiplier: 2,
+      synthesisMode,
       model: 'fake-model',
     },
   });
@@ -241,5 +247,27 @@ describe('Pipeline', () => {
     assert.equal(sitePosts.length, 1);
     const pending = await new NewsRepository().selectPending(100);
     assert.equal(pending.length, 0);
+  });
+
+  it('SYNTHESIS_MODE=none ingests but never synthesizes (raw items stay new)', async () => {
+    await resetDb();
+    const pipeline = makePipeline(
+      [fakeSource([fetchedItem(1), fetchedItem(2), fetchedItem(3)])],
+      [okGenerator('site')],
+      2,
+      'none',
+    );
+    const result = await pipeline.run();
+    assert.equal(result.status, 'skipped');
+    assert.equal(result.postsCreated, 0);
+    assert.equal((await db.select().from(posts)).length, 0, 'no digest produced');
+    const pending = await new NewsRepository().selectPending(100);
+    assert.ok(pending.length >= 3, 'items stay new — served raw via /api/news');
+  });
+
+  it('SYNTHESIS_MODE=local is rejected as not implemented', async () => {
+    await resetDb();
+    const pipeline = makePipeline([fakeSource([fetchedItem(1)])], [okGenerator('site')], 2, 'local');
+    await assert.rejects(() => pipeline.run(), /not implemented/);
   });
 });

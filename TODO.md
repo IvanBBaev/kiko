@@ -32,9 +32,18 @@ need a deeper change or external infra:
 
 ## Next
 
-- [ ] Twitter/X post generator — configurable single tweet vs short thread (X
-      standards). LinkedIn exists; the generator registry + `kind` plumbing are
-      ready. (Was in progress when the source-scale work took priority.)
+- [ ] **First real `npm run pipeline` against the Anthropic API** (mode
+      `anthropic`) — the one blocker; read the merged result critically (readable?
+      citations valid? grounded? would-publish LinkedIn?). Everything below waits
+      on this. `SYNTHESIS_MODE=none` already serves raw items with zero LLM.
+- [ ] `SYNTHESIS_MODE=local` — Ollama adapter behind `DigestSynthesizer` (degraded
+      but valid citation handling; not symmetric with Anthropic SDK). Only after
+      the anthropic synthesis is verified readable — don't run two unproven paths.
+- [ ] On-demand social posts **per news (cluster), not per digest**: LinkedIn (re-input),
+      Twitter/X (single vs short thread), Facebook (conversational). Each a
+      `PostGenerator` + registry line. DECIDED: synchronous response backed by a
+      **content cache keyed (news × channel × language)** — no per-user history,
+      no PII (independent of the identity question). Build after synthesis is proven.
 - [ ] Relevance ranking before synthesis — now that ingestion is data-driven and
       can scale to hundreds/thousands of sources, recency+cluster won't surface
       the best items from tens of thousands/day. Score/LLM-rank to pick top-N
