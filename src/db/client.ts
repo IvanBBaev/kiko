@@ -83,6 +83,20 @@ CREATE TABLE IF NOT EXISTS feed_validators (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS sources (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL DEFAULT 'rss',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  error_count INTEGER NOT NULL DEFAULT 0,
+  last_ok_at TEXT,
+  last_error_at TEXT,
+  last_error TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sources_enabled ON sources(enabled);
+
 CREATE TABLE IF NOT EXISTS post_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,

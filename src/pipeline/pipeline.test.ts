@@ -80,7 +80,8 @@ const failingGenerator: PostGenerator = {
 
 function makePipeline(sources: NewsSource[], generators: PostGenerator[], minItems = 2) {
   return new Pipeline({
-    sources,
+    listSources: async () => sources.map((source, i) => ({ id: i + 1, source })),
+    onSourceResult: async () => {},
     synthesizer: fakeSynthesizer,
     generators,
     newsRepo: new NewsRepository(),
@@ -91,6 +92,8 @@ function makePipeline(sources: NewsSource[], generators: PostGenerator[], minIte
       maxItemsPerDigest: 10,
       minItemsPerDigest: minItems,
       itemSummaryMaxChars: 400,
+      fetchConcurrency: 8,
+      candidatePoolMultiplier: 2,
       model: 'fake-model',
     },
   });

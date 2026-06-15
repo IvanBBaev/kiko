@@ -32,6 +32,16 @@ need a deeper change or external infra:
 
 ## Next
 
+- [ ] Twitter/X post generator — configurable single tweet vs short thread (X
+      standards). LinkedIn exists; the generator registry + `kind` plumbing are
+      ready. (Was in progress when the source-scale work took priority.)
+- [ ] Relevance ranking before synthesis — now that ingestion is data-driven and
+      can scale to hundreds/thousands of sources, recency+cluster won't surface
+      the best items from tens of thousands/day. Score/LLM-rank to pick top-N
+      before the digest. Becomes mandatory as the source set grows toward 1500.
+- [ ] Grow the source registry toward 1500 via `sources import` (OPML bundles /
+      awesome-AI-RSS lists); health auto-disable prunes dead feeds. Pair with
+      retention + relevance ranking before going that wide.
 - [ ] Litestream continuous replication (`db:backup` covers the basic case).
 
 ## Backlog (when needed)

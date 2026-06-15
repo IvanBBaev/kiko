@@ -106,6 +106,12 @@ export const config = {
     maxItemsPerDigest: int('MAX_ITEMS_PER_DIGEST', process.env.MAX_ITEMS_PER_DIGEST, 15, 1),
     minItemsPerDigest: int('MIN_ITEMS_PER_DIGEST', process.env.MIN_ITEMS_PER_DIGEST, 3, 1),
     itemSummaryMaxChars: int('ITEM_SUMMARY_MAX_CHARS', process.env.ITEM_SUMMARY_MAX_CHARS, 400, 1),
+    /** Max feeds fetched at once — bounds load across a large source set. */
+    fetchConcurrency: int('FETCH_CONCURRENCY', process.env.FETCH_CONCURRENCY, 24, 1),
+    /** Consecutive fetch failures before a source is auto-disabled. */
+    sourceDisableThreshold: int('SOURCE_DISABLE_THRESHOLD', process.env.SOURCE_DISABLE_THRESHOLD, 10, 1),
+    /** Candidate pool = MAX_ITEMS_PER_DIGEST × this (wider window at many sources). */
+    candidatePoolMultiplier: int('CANDIDATE_POOL_MULTIPLIER', process.env.CANDIDATE_POOL_MULTIPLIER, 4, 1),
   },
 
   llm: {

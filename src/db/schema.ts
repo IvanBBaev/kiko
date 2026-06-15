@@ -104,7 +104,33 @@ export const postEvents = sqliteTable(
   (t) => [index('idx_post_events_post').on(t.postId), index('idx_post_events_type').on(t.type)],
 );
 
+/**
+ * Data-driven news-source registry — replaces the hard-coded feed array so the
+ * source set can grow to hundreds/thousands and be managed at runtime (import,
+ * enable/disable) without a redeploy. Per-source health (error_count, last ok/
+ * error) lets the pipeline auto-disable persistently failing feeds.
+ */
+export const sources = sqliteTable(
+  'sources',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    url: text('url').notNull().unique(),
+    /** Source adapter kind (rss today). */
+    kind: text('kind').notNull().default('rss'),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    /** Consecutive fetch failures; reset to 0 on success. */
+    errorCount: integer('error_count').notNull().default(0),
+    lastOkAt: text('last_ok_at'),
+    lastErrorAt: text('last_error_at'),
+    lastError: text('last_error'),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [index('idx_sources_enabled').on(t.enabled)],
+);
+
 export type NewsItem = typeof newsItems.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Run = typeof runs.$inferSelect;
 export type PostEvent = typeof postEvents.$inferSelect;
+export type Source = typeof sources.$inferSelect;

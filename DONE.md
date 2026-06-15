@@ -2,6 +2,33 @@
 
 Completed work, newest first. Active items live in [TODO.md](TODO.md).
 
+## 2026-06-15 — Data-driven source registry (scale ingestion to many feeds)
+
+Re-architected ingestion from a hard-coded feed array to a data-driven registry,
+so the source set can grow to hundreds/thousands and be managed at runtime. Built
+as the "hybrid" path: scalable machinery now, seeded with a curated quality set;
+grows via import. Gate green throughout (135 → 148 tests, coverage 95.4/84.9/94.0).
+
+- [x] **`sources` table + `SourcesRepository`** — registry with per-source health
+      (`error_count`, last ok/error) and **auto-disable** after N consecutive
+      failures; covered by the schema-drift test. Idempotent `add` (dedupes by URL).
+- [x] **Data-driven, concurrency-limited ingest** — the pipeline resolves enabled
+      sources at run time (not a static array) and fetches them through a bounded
+      `pool()` (`FETCH_CONCURRENCY`, default 24) instead of firing all at once, so
+      hundreds/thousands of feeds don't drown the event loop. Each outcome updates
+      source health.
+- [x] **Curated seed + import CLI** — `npm run sources:seed` loads ~38 verified
+      feeds (research labs, reputable media, high-signal practitioners — all
+      checked live); `npm run sources -- import <opml|list>` grows it (OPML or
+      `Name | url` list, regex-parsed, deduped). arXiv/aggregator firehoses left
+      out of the seed until relevance ranking lands.
+- [x] **Wider candidate pool** (`CANDIDATE_POOL_MULTIPLIER`, default 4) so the
+      cluster/LLM editorial pick sees more of the day across many sources.
+
+Deferred (now tracked in TODO as the real cost of going wide): relevance ranking
+(mandatory beyond a few hundred sources), retention cron, and the Twitter/X
+generator. 1500 sources is reachable via `import` + these follow-ups.
+
 ## 2026-06-14 — NOW-tier product epic (from the BA feature-gap analysis)
 
 Implemented the unblocked, highest-leverage gaps a business-analyst pass surfaced,

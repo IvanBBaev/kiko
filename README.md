@@ -18,9 +18,9 @@ serves them over a REST API (the site consuming it is a separate, future project
 
 ```
  RSS feeds ──▶ sources/ ──▶ pipeline/ ──▶ generators/ ──▶ SQLite ──▶ REST API ──▶ site / LinkedIn
-  (8 feeds)    RssSource     ingest → dedupe →  site post              (drizzle)
-               cond. GET     cluster → Claude   linkedin post                ▲
-                             synthesis          (second Claude call)    cron (croner)
+ (DB registry) RssSource     ingest → dedupe →  site post              (drizzle)
+   ~38 seed    cond. GET     cluster → Claude   linkedin post                ▲
+   (grows)     concurrency   synthesis          (second Claude call)    cron (croner)
 ```
 
 Full module map, mermaid flow and the plug-in contract:
@@ -34,7 +34,7 @@ concrete implementations are wired in exactly one place — [src/container.ts](s
 | Module                         | Role                                                     | Plug-in point                                                          |
 | ------------------------------ | -------------------------------------------------------- | ---------------------------------------------------------------------- |
 | `core/`                        | Domain types, ports, pure logic (dedupe, clustering)     | —                                                                      |
-| `sources/`                     | `NewsSource` implementations (RSS today)                 | **[sources/index.ts](src/sources/index.ts)** — add/remove a line       |
+| `sources/`                     | `NewsSource` impls (RSS) + curated seed list             | **DB `sources` registry** — `npm run sources:seed` / `import`          |
 | `llm/`                         | Anthropic client + `DigestSynthesizer`                   | swap in container                                                      |
 | `generators/`                  | `PostGenerator` per output channel (site, LinkedIn)      | **[generators/index.ts](src/generators/index.ts)** — add/remove a line |
 | `db/`                          | Drizzle schema + repository classes                      | —                                                                      |
@@ -47,8 +47,11 @@ independently; one failing marks the run `partial`, the rest still publish.
 
 **Pipeline** (cron, default 07:00 daily; also triggerable via API):
 
-1. **Ingest** — fetch all feeds in parallel (`rss-parser`), drop items older than
-   `MAX_ITEM_AGE_DAYS`, strip HTML, trim summaries to `ITEM_SUMMARY_MAX_CHARS`.
+1. **Ingest** — fetch the enabled sources from the registry with bounded
+   concurrency (`FETCH_CONCURRENCY`), drop items older than `MAX_ITEM_AGE_DAYS`,
+   strip HTML, trim summaries to `ITEM_SUMMARY_MAX_CHARS`. Each source's outcome
+   updates its health; a feed that fails `SOURCE_DISABLE_THRESHOLD` times in a row
+   is auto-disabled.
 2. **Dedupe** — content hash over normalized title + canonical URL (tracking params
    stripped); unique URL constraint as second line of defense. Nothing already seen
    re-enters the pipeline.
@@ -102,6 +105,17 @@ never leaks through it. Writes are throttled only by the global rate limiter, so
 job (tracked in [TODO.md](TODO.md)) and consider an `ANALYTICS_TOKEN` gate or
 event batching.
 
+**News sources.** Sources live in a data-driven `sources` table (not a code
+array), so the set grows to hundreds/thousands and is managed at runtime without
+a redeploy. Seed the curated ~38-feed starter set with `npm run sources:seed`,
+then grow it with `npm run sources -- import <feeds.opml|list.txt>` (OPML export
+from any feed reader, or a `Name | url` / bare-url list). Ingestion fetches the
+enabled sources with bounded concurrency and **auto-disables** a feed after
+`SOURCE_DISABLE_THRESHOLD` consecutive failures, so dead feeds drop out on their
+own. The seed favors signal over count (research labs, reputable media,
+high-signal practitioners); arXiv/aggregator firehoses are left out until
+relevance ranking lands.
+
 **Topics.** The synthesizer tags each digest with 2–5 `topics` (steered toward a
 canonical set: models, research, funding, policy, safety, tooling, open-source,
 hardware, product, agents). Posts expose `topics`; filter the list and the RSS
@@ -124,6 +138,7 @@ claim is semantically supported by its source (that needs an LLM judge).
 nvm use                # Node 22 (.nvmrc)
 cp .env.example .env   # set ANTHROPIC_API_KEY
 npm install
+npm run sources:seed   # populate the source registry with the curated feeds
 npm run dev            # server + scheduler
 npm run ingest         # feeds → DB only, no LLM calls (zero tokens)
 npm run pipeline       # full one-off pipeline run from the CLI

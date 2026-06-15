@@ -12,7 +12,14 @@ import { getTableColumns, getTableName, type Table } from 'drizzle-orm';
 const { sqlite } = await import('./client.js');
 const schema = await import('./schema.js');
 
-const tables: Table[] = [schema.newsItems, schema.posts, schema.runs, schema.feedValidators, schema.postEvents];
+const tables: Table[] = [
+  schema.newsItems,
+  schema.posts,
+  schema.runs,
+  schema.feedValidators,
+  schema.postEvents,
+  schema.sources,
+];
 
 describe('schema.ts <-> bootstrap DDL drift', () => {
   for (const table of tables) {

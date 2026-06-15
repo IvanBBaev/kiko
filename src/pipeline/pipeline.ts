@@ -1,5 +1,6 @@
 import { findInvalidCitations } from '../core/citations.js';
 import { clusterItemIds, clusterItems } from '../core/cluster.js';
+import { pool } from '../core/pool.js';
 import type { DigestSynthesizer, NewsSource, PostGenerator } from '../core/ports.js';
 import type { FetchedItem, PostSourceRef, StoryCluster, SynthesisOutcome, UsageTotals } from '../core/types.js';
 import type { NewsRepository } from '../db/news-repository.js';
@@ -15,11 +16,25 @@ export interface PipelineOptions {
   maxItemsPerDigest: number;
   minItemsPerDigest: number;
   itemSummaryMaxChars: number;
+  /** Max feeds fetched concurrently — bounds load when there are many sources. */
+  fetchConcurrency: number;
+  /** Candidate pool = maxItemsPerDigest × this; a wider recency window so the
+   *  cluster/LLM editorial pick sees more of the day across many sources. */
+  candidatePoolMultiplier: number;
   model: string;
 }
 
+/** A source to fetch plus the registry id used to record its health. */
+export interface SourceHandle {
+  id: number;
+  source: NewsSource;
+}
+
 export interface PipelineDeps {
-  sources: NewsSource[];
+  /** Resolve the current enabled sources at run time (data-driven, not static). */
+  listSources: () => Promise<SourceHandle[]>;
+  /** Report a source's fetch outcome so the registry can track health/auto-disable. */
+  onSourceResult: (id: number, ok: boolean, error?: string) => Promise<void>;
   synthesizer: DigestSynthesizer;
   generators: PostGenerator[];
   newsRepo: NewsRepository;
@@ -51,19 +66,29 @@ export class Pipeline {
     return this.running;
   }
 
-  /** Fetch every source (failures are skipped, not fatal) and store new items. */
+  /**
+   * Fetch every enabled source (failures are skipped, not fatal) and store new
+   * items. Sources are resolved at run time from the registry and fetched with
+   * bounded concurrency; each source's outcome is reported back so the registry
+   * can track health and auto-disable dead feeds.
+   */
   async ingest(): Promise<{ itemsFetched: number; itemsNew: number }> {
-    const { sources, newsRepo, options } = this.deps;
-    const results = await Promise.allSettled(
-      sources.map((s) => s.fetch({ maxAgeDays: options.maxItemAgeDays, summaryMaxChars: options.itemSummaryMaxChars })),
-    );
-
+    const { listSources, onSourceResult, newsRepo, options } = this.deps;
+    const handles = await listSources();
     const fetched: FetchedItem[] = [];
-    results.forEach((result, i) => {
-      if (result.status === 'fulfilled') {
-        fetched.push(...result.value);
-      } else {
-        log.warn({ source: sources[i]?.name, reason: String(result.reason) }, 'news source failed');
+
+    await pool(handles, options.fetchConcurrency, async ({ id, source }) => {
+      try {
+        const items = await source.fetch({
+          maxAgeDays: options.maxItemAgeDays,
+          summaryMaxChars: options.itemSummaryMaxChars,
+        });
+        fetched.push(...items);
+        await onSourceResult(id, true);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.warn({ source: source.name, reason: message }, 'news source failed');
+        await onSourceResult(id, false, message);
       }
     });
 
@@ -102,7 +127,7 @@ export class Pipeline {
       // 2. Select 2x the digest cap — clustering compresses multi-source
       // coverage, so more stories fit the same budget. Stories cut by the cap
       // stay 'new' and roll over to the next run.
-      const pending = await newsRepo.selectPending(options.maxItemsPerDigest * 2);
+      const pending = await newsRepo.selectPending(options.maxItemsPerDigest * options.candidatePoolMultiplier);
       const clusters = clusterItems(pending).slice(0, options.maxItemsPerDigest);
 
       // Token guard: a digest from 1-2 stories isn't worth an Opus call.

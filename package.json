@@ -28,6 +28,8 @@
     "ingest": "tsx src/cli/ingest.ts",
     "db:backup": "tsx src/cli/backup.ts",
     "eval": "tsx src/cli/eval.ts",
+    "sources": "tsx src/cli/sources.ts",
+    "sources:seed": "tsx src/cli/sources.ts seed",
     "og:font": "node scripts/build-og-font.mjs"
   },
   "dependencies": {
