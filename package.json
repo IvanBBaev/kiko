@@ -7,7 +7,7 @@
   "author": "Ivan Baev <ivanbbaev@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LeassTaTT/kiko.git"
+    "url": "git+https://github.com/IvanBBaev/kiko.git"
   },
   "type": "module",
   "engines": {

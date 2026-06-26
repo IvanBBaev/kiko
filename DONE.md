@@ -172,7 +172,7 @@ Residuals tracked in TODO.md: R3b (drizzle-kit migrations) and A7 (CDN purge).
 
 ## 2026-06-12 — GitHub: remote, identity, Dependabot consolidation
 
-- [x] origin → github.com/LeassTaTT/kiko (HTTPS, osxkeychain).
+- [x] origin → github.com/IvanBBaev/kiko (HTTPS, osxkeychain).
 - [x] All commits rewritten to `ivanbbaev@gmail.com` (local git config; the
       global config keeps the work address for work repos).
 - [x] main pushed with the clean history; CI + Dependabot active.
