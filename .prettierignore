@@ -7,3 +7,5 @@ coverage/
 CLAUDE.md
 src/og/font-data.ts
 docs/licenses/
+docs/.vitepress/cache/
+docs/.vitepress/dist/

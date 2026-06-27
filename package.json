@@ -18,8 +18,8 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
-    "test:coverage": "c8 -r text -r lcov --check-coverage --statements 85 --lines 85 --branches 80 --functions 88 node --import tsx --test \"src/**/*.test.ts\"",
+    "test": "NODE_OPTIONS=--import=tsx node --test \"src/**/*.test.ts\"",
+    "test:coverage": "NODE_OPTIONS=--import=tsx c8 -r text -r lcov --check-coverage --statements 85 --lines 85 --branches 80 --functions 88 node --test \"src/**/*.test.ts\"",
     "check": "npm run build && npm run typecheck && npm run lint && npm run format:check && npm run test:coverage",
     "lint": "eslint src",
     "format": "prettier --write .",
@@ -30,7 +30,10 @@
     "eval": "tsx src/cli/eval.ts",
     "sources": "tsx src/cli/sources.ts",
     "sources:seed": "tsx src/cli/sources.ts seed",
-    "og:font": "node scripts/build-og-font.mjs"
+    "og:font": "node scripts/build-og-font.mjs",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
@@ -55,10 +58,13 @@
     "c8": "^11.0.0",
     "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
+    "mermaid": "^11.16.0",
     "pino-pretty": "^13.1.3",
     "prettier": "^3.8.4",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.61.0"
+    "typescript-eslint": "^8.61.0",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17"
   }
 }
