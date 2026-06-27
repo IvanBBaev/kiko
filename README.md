@@ -1,5 +1,11 @@
 # kiko
 
+<!-- badges:start -->
+| [![node](https://img.shields.io/badge/node-%3E%3D20.12-5FA04E?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org) | [![license](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE) | [![last commit](https://img.shields.io/github/last-commit/IvanBBaev/kiko?style=flat-square&logo=git&logoColor=white&label=last%20commit)](https://github.com/IvanBBaev/kiko/commits/main) | [![built with TypeScript](https://img.shields.io/badge/built%20with-TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org) |
+| :--: | :--: | :--: | :--: |
+<!-- badges:end -->
+
+
 Backend service that collects AI news from curated sources, synthesizes the latest
 developments with Claude into **site digest posts** and **LinkedIn-ready posts**, and
 serves them over a REST API (the site consuming it is a separate, future project).
